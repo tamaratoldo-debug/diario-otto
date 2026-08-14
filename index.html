@@ -44,10 +44,7 @@
   .empty-note{font-size:.75rem; color:var(--ink-muted); padding:4px 0}
 
   .med-row{display:flex; align-items:center; gap:12px; background:#FBFAF7; border-radius:12px; padding:10px 12px; margin-bottom:8px}
-  .pending-meds{padding-bottom:10px; margin-bottom:10px; border-bottom:1px solid #F1EEE6}
-  .pending-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px}
-  .pending-head span{font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.03em; color:#3E8A5C}
-  .pending-head button{font-size:.72rem; font-weight:600}
+  .pending-checkbox{width:18px; height:18px; border-radius:50%; border:2px solid #7FB89A; flex-shrink:0; display:inline-block}
   .med-row:last-child{margin-bottom:0}
   .check-btn{width:34px; height:34px; border-radius:999px; border:none; background:var(--c-remedio); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer}
   .med-name{font-size:.9rem; font-weight:500}
@@ -321,19 +318,17 @@ function pendingMedsForToday(){
   return meds.filter(isMedActiveToday).filter(m=> dosesGivenToday(m.id).length===0);
 }
 
-function pendingMedsHtml(pending){
-  if(pending.length===0) return '';
-  return `<div class="pending-meds">
-    <div class="pending-head"><span>Remédios de hoje</span><button class="link-btn" id="mgrLinkInline" style="color:#3E8A5C">Gerenciar</button></div>
-    ${pending.map(m=>`
-      <div class="med-row">
-        <button class="check-btn" style="background:#fff; border:2px solid #9FCBAE" data-med="${m.id}" aria-label="Marcar como dado"></button>
-        <div>
-          <div class="med-name">${esc(m.name)}</div>
-          <div class="med-sub">${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}</div>
-        </div>
-      </div>`).join('')}
-  </div>`;
+function pendingRowsHtml(pending){
+  return pending.map(m=>{
+    const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}`;
+    return `<button class="entry-row" data-med="${m.id}">
+      <div class="entry-top">
+        <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
+        <span class="pending-checkbox" aria-label="Marcar como dado"></span>
+      </div>
+      <div class="entry-sub">${sub}</div>
+    </button>`;
+  }).join('');
 }
 
 function toggleMedToday(medId){
@@ -416,7 +411,7 @@ function renderTimeline(){
     html += `<div class="month-label">${month.key}</div>`;
     for(const day of month.days){
       const isToday = day.key===todayKey;
-      const pendingHtml = isToday ? pendingMedsHtml(pending) : '';
+      const pendingHtml = isToday ? pendingRowsHtml(pending) : '';
       if(day.items.length===0 && !pendingHtml) continue;
       const dayNum = day.items[0] ? fmtDay(day.items[0].date) : new Date().getDate();
       const dayMon = day.items[0] ? fmtMonthShort(day.items[0].date) : fmtMonthShort(new Date().toISOString());
@@ -446,8 +441,6 @@ function renderTimeline(){
   host.innerHTML = html;
   host.querySelectorAll('[data-id]').forEach(b=> b.addEventListener('click', ()=> openEntryModal(null, b.dataset.id)));
   host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med)));
-  const mgrLink = document.getElementById('mgrLinkInline');
-  if(mgrLink) mgrLink.addEventListener('click', ()=> openMedManager(renderTimeline));
 }
 
 function renderAll(){ renderHero(); renderTimeline(); }
