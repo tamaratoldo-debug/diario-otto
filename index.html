@@ -44,6 +44,10 @@
   .empty-note{font-size:.75rem; color:var(--ink-muted); padding:4px 0}
 
   .med-row{display:flex; align-items:center; gap:12px; background:#FBFAF7; border-radius:12px; padding:10px 12px; margin-bottom:8px}
+  .pending-meds{padding-bottom:10px; margin-bottom:10px; border-bottom:1px solid #F1EEE6}
+  .pending-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px}
+  .pending-head span{font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.03em; color:#3E8A5C}
+  .pending-head button{font-size:.72rem; font-weight:600}
   .med-row:last-child{margin-bottom:0}
   .check-btn{width:34px; height:34px; border-radius:999px; border:none; background:var(--c-remedio); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer}
   .med-name{font-size:.9rem; font-weight:500}
@@ -144,17 +148,6 @@
   </div>
 
   <div class="card quick" id="quickActions"></div>
-
-  <div class="card section">
-    <div class="section-head">
-      <div class="section-title">Remédios de hoje</div>
-      <button class="link-btn" id="btnMedManager" style="color:var(--c-remedio)">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 12H3M16 6H3M16 18H3M18 9v6M21 12h-6"/></svg>
-        Gerenciar
-      </button>
-    </div>
-    <div id="medsToday"></div>
-  </div>
 
   <div class="card section" id="chartSection" style="display:none">
     <div class="section-title" style="margin-bottom:8px">Evolução do peso</div>
@@ -318,33 +311,29 @@ function renderQuickActions(){
   host.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=> openEntryModal(b.dataset.cat)));
 }
 
-// ---------- render: meds today ----------
+// ---------- pending meds (rendered inline inside today's day-card) ----------
 function dosesGivenToday(medId){
   const t = todayStr();
   return entries.filter(e=> e.category==='remedio' && e.medId===medId && isSameDay(e.date, t));
 }
 
-function renderMedsToday(){
-  const host = document.getElementById('medsToday');
-  const active = meds.filter(isMedActiveToday);
-  if(active.length===0){
-    host.innerHTML = `<div class="empty-note">Nenhum remédio cadastrado. Toque em "Gerenciar" pra cadastrar os remédios do Otto uma vez só.</div>`;
-    return;
-  }
-  host.innerHTML = active.map(m=>{
-    const given = dosesGivenToday(m.id).length > 0;
-    const btnStyle = given
-      ? `background:var(--c-remedio); border:none`
-      : `background:#fff; border:2px solid #D8CFAF`;
-    return `<div class="med-row">
-      <button class="check-btn" style="${btnStyle}" data-med="${m.id}" aria-label="${given?'Já dado hoje, toque pra desfazer':'Marcar como dado'}">${given? icon('check',16,'#fff') : ''}</button>
-      <div>
-        <div class="med-name">${esc(m.name)}${given?' <span style=\"color:var(--c-remedio); font-weight:500\">· dado hoje</span>':''}</div>
-        <div class="med-sub">${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}</div>
-      </div>
-    </div>`;
-  }).join('');
-  host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med)));
+function pendingMedsForToday(){
+  return meds.filter(isMedActiveToday).filter(m=> dosesGivenToday(m.id).length===0);
+}
+
+function pendingMedsHtml(pending){
+  if(pending.length===0) return '';
+  return `<div class="pending-meds">
+    <div class="pending-head"><span>Remédios de hoje</span><button class="link-btn" id="mgrLinkInline" style="color:#3E8A5C">Gerenciar</button></div>
+    ${pending.map(m=>`
+      <div class="med-row">
+        <button class="check-btn" style="background:#fff; border:2px solid #9FCBAE" data-med="${m.id}" aria-label="Marcar como dado"></button>
+        <div>
+          <div class="med-name">${esc(m.name)}</div>
+          <div class="med-sub">${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}</div>
+        </div>
+      </div>`).join('')}
+  </div>`;
 }
 
 function toggleMedToday(medId){
@@ -352,7 +341,7 @@ function toggleMedToday(medId){
   if(!med) return;
   const givenToday = dosesGivenToday(medId);
   if(givenToday.length > 0){
-    // undo: remove today's dose(s) logged from the checklist for this med
+    // undo: remove today's dose(s) logged for this med
     const idsToRemove = new Set(givenToday.map(e=>e.id));
     entries = entries.filter(e=> !idsToRemove.has(e.id));
   } else {
@@ -395,24 +384,44 @@ function renderTimeline(){
   list.sort((a,b)=> new Date(b.date)-new Date(a.date));
 
   const host = document.getElementById('timeline');
-  if(list.length===0){
-    host.innerHTML = `<div class="empty-state">${icon('paw',28,'currentColor')}<div style="font-size:.85rem; margin-top:8px">${entries.length===0? 'Nenhum registro ainda. Toque numa categoria acima pra começar.' : 'Nada encontrado com esse filtro.'}</div></div>`;
-    return;
-  }
 
-  let html=''; let curMonth=null; let curDay=null; let dayItems=[]; const months=[];
+  let html=''; const months=[];
   for(const e of list){
     const mk = fmtMonthYear(e.date); const dk = new Date(e.date).toDateString();
-    if(mk!==curMonth){ months.push({key:mk, days:[]}); curMonth=mk; curDay=null; }
-    if(dk!==curDay){ months[months.length-1].days.push({key:dk, items:[]}); curDay=dk; }
-    months[months.length-1].days[months[months.length-1].days.length-1].items.push(e);
+    if(!months.length || months[months.length-1].key!==mk){ months.push({key:mk, days:[]}); }
+    const curMonth = months[months.length-1];
+    if(!curMonth.days.length || curMonth.days[curMonth.days.length-1].key!==dk){ curMonth.days.push({key:dk, items:[]}); }
+    curMonth.days[curMonth.days.length-1].items.push(e);
+  }
+
+  // Only show the pending meds checklist when it's meaningful: no filter narrowing to something unrelated, no active search.
+  const showPending = (filter==='todos' || filter==='remedio') && !search.trim();
+  const pending = showPending ? pendingMedsForToday() : [];
+  const todayKey = new Date().toDateString();
+  const todayMonthKey = fmtMonthYear(new Date().toISOString());
+
+  if(pending.length > 0){
+    let curMonth = months.find(m=> m.key===todayMonthKey);
+    if(!curMonth){ curMonth = {key:todayMonthKey, days:[]}; months.unshift(curMonth); }
+    let todayDay = curMonth.days.find(d=> d.key===todayKey);
+    if(!todayDay){ todayDay = {key:todayKey, items:[]}; curMonth.days.unshift(todayDay); }
+  }
+
+  if(months.length===0){
+    host.innerHTML = `<div class="empty-state">${icon('paw',28,'currentColor')}<div style="font-size:.85rem; margin-top:8px">${entries.length===0? 'Nenhum registro ainda. Toque numa categoria acima pra começar.' : 'Nada encontrado com esse filtro.'}</div></div>`;
+    return;
   }
 
   for(const month of months){
     html += `<div class="month-label">${month.key}</div>`;
     for(const day of month.days){
-      const first = day.items[0];
-      html += `<div class="day-card"><div class="day-num"><div class="n">${fmtDay(first.date)}</div><div class="m">${fmtMonthShort(first.date)}</div></div><div class="day-sep"></div><div class="entries-col">`;
+      const isToday = day.key===todayKey;
+      const pendingHtml = isToday ? pendingMedsHtml(pending) : '';
+      if(day.items.length===0 && !pendingHtml) continue;
+      const dayNum = day.items[0] ? fmtDay(day.items[0].date) : new Date().getDate();
+      const dayMon = day.items[0] ? fmtMonthShort(day.items[0].date) : fmtMonthShort(new Date().toISOString());
+      html += `<div class="day-card"><div class="day-num"><div class="n">${dayNum}</div><div class="m">${dayMon}</div></div><div class="day-sep"></div><div class="entries-col">`;
+      html += pendingHtml;
       html += day.items.map(e=>{
         const cat = CATEGORIES[e.category];
         let badge='';
@@ -436,9 +445,12 @@ function renderTimeline(){
   }
   host.innerHTML = html;
   host.querySelectorAll('[data-id]').forEach(b=> b.addEventListener('click', ()=> openEntryModal(null, b.dataset.id)));
+  host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med)));
+  const mgrLink = document.getElementById('mgrLinkInline');
+  if(mgrLink) mgrLink.addEventListener('click', ()=> openMedManager(renderTimeline));
 }
 
-function renderAll(){ renderHero(); renderMedsToday(); renderTimeline(); }
+function renderAll(){ renderHero(); renderTimeline(); }
 
 // ---------- warning banner ----------
 function showWarning(msg){
@@ -819,7 +831,6 @@ function openMedManager(onDone){
 
 // ---------- top-level wiring ----------
 document.getElementById('btnSettings').addEventListener('click', openSettings);
-document.getElementById('btnMedManager').addEventListener('click', ()=> openMedManager(renderMedsToday));
 document.getElementById('searchInput').addEventListener('input', e=>{ search=e.target.value; renderTimeline(); });
 
 renderQuickActions();
