@@ -178,6 +178,7 @@
 </div>
 
 <div id="modalHost"></div>
+<div id="lightboxHost"></div>
 
 <script>
 // ---------- storage (localStorage, synchronous — no more hanging saves) ----------
@@ -465,7 +466,6 @@ function renderTimeline(){
           </div>
           ${badge}
           ${sub?`<div class="entry-sub">${esc(sub)}</div>`:''}
-          ${e.photo?`<span class="entry-thumb-wrap" data-photo="${e.photo}"><img class="entry-thumb" src="${e.photo}"/></span>`:''}
         </button>`;
       }).join('');
       html += `</div></div>`;
@@ -474,16 +474,16 @@ function renderTimeline(){
   host.innerHTML = html;
   host.querySelectorAll('[data-id]').forEach(b=> b.addEventListener('click', ()=> openEntryModal(null, b.dataset.id)));
   host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med)));
-  host.querySelectorAll('.entry-thumb-wrap').forEach(w=> w.addEventListener('click', (ev)=>{ ev.stopPropagation(); openLightbox(w.dataset.photo); }));
 }
 
 function renderAll(){ renderHero(); renderTimeline(); }
 
 function openLightbox(src){
-  const host = document.getElementById('modalHost');
+  const host = document.getElementById('lightboxHost');
   host.innerHTML = `<div class="lightbox" id="ovLightbox"><button class="lightbox-close" id="closeLightbox">${icon('x',20,'#fff')}</button><img src="${src}"/></div>`;
-  document.getElementById('ovLightbox').addEventListener('click', (e)=>{ if(e.target.id==='ovLightbox') closeModal(); });
-  document.getElementById('closeLightbox').addEventListener('click', closeModal);
+  const close = ()=> host.innerHTML='';
+  document.getElementById('ovLightbox').addEventListener('click', (e)=>{ if(e.target.id==='ovLightbox') close(); });
+  document.getElementById('closeLightbox').addEventListener('click', close);
 }
 
 // ---------- warning banner ----------
@@ -544,7 +544,7 @@ function openEntryModal(category, editId){
       </div>
       <div class="field"><label>Gravidade (opcional)</label><div class="row2">${GRAVIDADES.map(g=>`<button type="button" class="pick-btn ${form.gravidade===g?'sel':''}" style="flex:1; ${form.gravidade===g?`background:${cat.hex}`:''}" data-g="${g}">${g}</button>`).join('')}</div></div>
       <div class="field"><label>Foto (opcional)</label>
-        ${form.photo ? `<div class="photo-preview"><img src="${form.photo}"/><button type="button" id="removePhoto" class="photo-remove">${icon('x',13,'#fff')}</button></div>`
+        ${form.photo ? `<div class="photo-preview"><img id="photoThumb" src="${form.photo}" style="cursor:pointer"/><button type="button" id="removePhoto" class="photo-remove">${icon('x',13,'#fff')}</button></div><div class="hint">Toque na foto pra ver em tamanho maior</div>`
           : `<button type="button" id="addPhotoBtn" class="add-trigger">${icon('camera',15)} Adicionar foto</button>`}
         <input type="file" id="photoInput" accept="image/*" style="display:none"/>
       </div>`;
@@ -654,6 +654,7 @@ function openEntryModal(category, editId){
     const addBtn = document.getElementById('addPhotoBtn');
     const input = document.getElementById('photoInput');
     const removeBtn = document.getElementById('removePhoto');
+    const thumb = document.getElementById('photoThumb');
     if(addBtn && input) addBtn.addEventListener('click', ()=> input.click());
     if(input) input.addEventListener('change', async (e)=>{
       const file = e.target.files[0];
@@ -667,6 +668,7 @@ function openEntryModal(category, editId){
       refreshBody();
     });
     if(removeBtn) removeBtn.addEventListener('click', ()=>{ form.photo=''; refreshBody(); });
+    if(thumb) thumb.addEventListener('click', ()=> openLightbox(form.photo));
   }
   function refreshBody(){ document.getElementById('bodyEntry').innerHTML = fieldsHtml(); wireBodyOnly(); toggleSave(); }
   function wireBodyOnly(){
