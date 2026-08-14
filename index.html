@@ -559,7 +559,7 @@ function openEntryModal(category, editId){
     if(editing) document.getElementById('btnDelEntry').addEventListener('click', ()=>{ closeModal(); openConfirmDelete(editing.id); });
     document.getElementById('btnSaveEntry').addEventListener('click', save);
 
-    const t = document.getElementById('f_title'); if(t) t.addEventListener('input', e=>{ form.title=e.target.value; syncSuggestions(); });
+    const t = document.getElementById('f_title'); if(t) t.addEventListener('input', e=>{ form.title=e.target.value; toggleSave(); });
     const v = document.getElementById('f_value'); if(v) v.addEventListener('input', e=>{ form.value=e.target.value; toggleSave(); });
     const cl = document.getElementById('f_clinica'); if(cl) cl.addEventListener('input', e=>{ form.clinica=e.target.value; syncSuggestions(); });
     const q = document.getElementById('f_quantidade'); if(q) q.addEventListener('input', e=> form.quantidade=e.target.value);
@@ -603,7 +603,7 @@ function openEntryModal(category, editId){
   function toggleSave(){ document.getElementById('btnSaveEntry').disabled = !canSave(); }
   function refreshBody(){ document.getElementById('bodyEntry').innerHTML = fieldsHtml(); wireBodyOnly(); toggleSave(); }
   function wireBodyOnly(){
-    const t = document.getElementById('f_title'); if(t) t.addEventListener('input', e=>{ form.title=e.target.value; });
+    const t = document.getElementById('f_title'); if(t) t.addEventListener('input', e=>{ form.title=e.target.value; toggleSave(); });
     const v = document.getElementById('f_value'); if(v) v.addEventListener('input', e=>{ form.value=e.target.value; toggleSave(); });
     const cl = document.getElementById('f_clinica'); if(cl) cl.addEventListener('input', e=>{ form.clinica=e.target.value; });
     const q = document.getElementById('f_quantidade'); if(q) q.addEventListener('input', e=> form.quantidade=e.target.value);
