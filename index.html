@@ -257,11 +257,17 @@ let settings = store.get('otto:settings', {sheetLink:''});
 let filter = 'todos';
 let search = '';
 
-function persistEntries(){ store.set('otto:entries', entries); }
-function persistFoods(){ store.set('otto:foods', foods); }
-function persistMeds(){ store.set('otto:meds', meds); }
-function persistChips(k){ store.set('otto:'+k+'-chips', chips[k]); }
-function persistSettings(){ store.set('otto:settings', settings); }
+function persistEntries(){ return writeStore('otto:entries', entries); }
+function persistFoods(){ return writeStore('otto:foods', foods); }
+function persistMeds(){ return writeStore('otto:meds', meds); }
+function persistChips(k){ return writeStore('otto:'+k+'-chips', chips[k]); }
+function persistSettings(){ return writeStore('otto:settings', settings); }
+function writeStore(key, value){
+  const ok = store.set(key, value);
+  if(ok){ const wh=document.getElementById('warningHost'); if(wh) wh.innerHTML=''; }
+  else showWarning('Não consegui salvar no armazenamento do navegador. Tente novamente.');
+  return ok;
+}
 
 // ---------- render: hero / peso ----------
 function renderHero(){
@@ -313,6 +319,11 @@ function renderQuickActions(){
 }
 
 // ---------- render: meds today ----------
+function dosesGivenToday(medId){
+  const t = todayStr();
+  return entries.filter(e=> e.category==='remedio' && e.medId===medId && isSameDay(e.date, t));
+}
+
 function renderMedsToday(){
   const host = document.getElementById('medsToday');
   const active = meds.filter(isMedActiveToday);
@@ -320,24 +331,35 @@ function renderMedsToday(){
     host.innerHTML = `<div class="empty-note">Nenhum remédio cadastrado. Toque em "Gerenciar" pra cadastrar os remédios do Otto uma vez só.</div>`;
     return;
   }
-  host.innerHTML = active.map(m=>`
-    <div class="med-row">
-      <button class="check-btn" data-med="${m.id}">${icon('check',16,'#fff')}</button>
+  host.innerHTML = active.map(m=>{
+    const given = dosesGivenToday(m.id).length > 0;
+    const btnStyle = given
+      ? `background:var(--c-remedio); border:none`
+      : `background:#fff; border:2px solid #D8CFAF`;
+    return `<div class="med-row">
+      <button class="check-btn" style="${btnStyle}" data-med="${m.id}" aria-label="${given?'Já dado hoje, toque pra desfazer':'Marcar como dado'}">${given? icon('check',16,'#fff') : ''}</button>
       <div>
-        <div class="med-name">${esc(m.name)}</div>
+        <div class="med-name">${esc(m.name)}${given?' <span style=\"color:var(--c-remedio); font-weight:500\">· dado hoje</span>':''}</div>
         <div class="med-sub">${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}</div>
       </div>
-    </div>
-  `).join('');
-  host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> quickLogMed(b.dataset.med)));
+    </div>`;
+  }).join('');
+  host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med)));
 }
 
-function quickLogMed(medId){
+function toggleMedToday(medId){
   const med = meds.find(m=>m.id===medId);
   if(!med) return;
-  let date = new Date();
-  if(med.horario){ const [h,m] = med.horario.split(':').map(Number); date.setHours(h,m,0,0); }
-  entries.push({ id:genId(), category:'remedio', medId:med.id, title:med.name, note:med.dose||'', date:date.toISOString(), createdAt:Date.now() });
+  const givenToday = dosesGivenToday(medId);
+  if(givenToday.length > 0){
+    // undo: remove today's dose(s) logged from the checklist for this med
+    const idsToRemove = new Set(givenToday.map(e=>e.id));
+    entries = entries.filter(e=> !idsToRemove.has(e.id));
+  } else {
+    let date = new Date();
+    if(med.horario){ const [h,m2] = med.horario.split(':').map(Number); date.setHours(h,m2,0,0); }
+    entries.push({ id:genId(), category:'remedio', medId:med.id, title:med.name, note:med.dose||'', date:date.toISOString(), createdAt:Date.now() });
+  }
   entries.sort((a,b)=> new Date(b.date)-new Date(a.date));
   persistEntries();
   renderAll();
@@ -461,7 +483,7 @@ function openEntryModal(category, editId){
     }
     if(category==='remedio'){
       h += `<div class="field"><label>Remédio</label>
-        <div class="pickgrid" id="medPick">${meds.map(m=>`<button type="button" class="pick-btn ${form.title===m.name?'sel':''}" style="${form.title===m.name?`background:${cat.hex}`:''}" data-name="${esc(m.name)}" data-dose="${esc(m.dose||'')}">${esc(m.name)}</button>`).join('') || '<span class="hint">Nenhum remédio cadastrado ainda.</span>'}</div>
+        <div class="pickgrid" id="medPick">${meds.map(m=>`<button type="button" class="pick-btn ${form.title===m.name?'sel':''}" style="${form.title===m.name?`background:${cat.hex}`:''}" data-name="${esc(m.name)}" data-dose="${esc(m.dose||'')}" data-horario="${esc(m.horario||'')}">${esc(m.name)}</button>`).join('') || '<span class="hint">Nenhum remédio cadastrado ainda.</span>'}</div>
         <button type="button" class="link-btn" id="openMedMgr" style="color:${cat.hex}; margin-top:8px">+ Gerenciar remédios</button>
         <div class="hint">Dica: pra remédios de hoje, use o checklist na tela principal — é mais rápido que abrir esse formulário.</div>
       </div>`;
@@ -545,7 +567,12 @@ function openEntryModal(category, editId){
     const openFM = document.getElementById('openFoodMgr'); if(openFM) openFM.addEventListener('click', ()=> openFoodManager(()=>{ refreshBody(); }));
 
     const medPick = document.getElementById('medPick');
-    if(medPick) medPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.title=b.dataset.name; if(!form.note && b.dataset.dose) form.note=b.dataset.dose; refreshBody(); }));
+    if(medPick) medPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
+      form.title=b.dataset.name;
+      if(!form.note && b.dataset.dose) form.note=b.dataset.dose;
+      if(!editing && b.dataset.horario) form.dateT=b.dataset.horario;
+      refreshBody();
+    }));
     const openMM = document.getElementById('openMedMgr'); if(openMM) openMM.addEventListener('click', ()=> openMedManager(()=>{ refreshBody(); }));
 
     const comoList = document.getElementById('comoList');
@@ -580,7 +607,7 @@ function openEntryModal(category, editId){
     const dt = document.getElementById('f_dateT'); if(dt) dt.addEventListener('input', e=> form.dateT=e.target.value);
     const foodPick = document.getElementById('foodPick'); if(foodPick) foodPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.title=b.dataset.name; refreshBody(); }));
     const openFM = document.getElementById('openFoodMgr'); if(openFM) openFM.addEventListener('click', ()=> openFoodManager(()=>{ refreshBody(); }));
-    const medPick = document.getElementById('medPick'); if(medPick) medPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.title=b.dataset.name; if(!form.note && b.dataset.dose) form.note=b.dataset.dose; refreshBody(); }));
+    const medPick = document.getElementById('medPick'); if(medPick) medPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.title=b.dataset.name; if(!form.note && b.dataset.dose) form.note=b.dataset.dose; if(!editing && b.dataset.horario) form.dateT=b.dataset.horario; refreshBody(); }));
     const openMM = document.getElementById('openMedMgr'); if(openMM) openMM.addEventListener('click', ()=> openMedManager(()=>{ refreshBody(); }));
     const comoList = document.getElementById('comoList'); if(comoList) comoList.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.comoComeu = form.comoComeu===b.dataset.v ? '' : b.dataset.v; refreshBody(); }));
     document.querySelectorAll('[data-g]').forEach(b=> b.addEventListener('click', ()=>{ form.gravidade = form.gravidade===b.dataset.g ? '' : b.dataset.g; refreshBody(); }));
