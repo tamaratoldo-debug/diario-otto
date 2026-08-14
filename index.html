@@ -242,9 +242,48 @@ const isSameDay = (iso, ds)=>{ const d=new Date(iso); return `${d.getFullYear()}
 const isMedActiveToday = med=>{ if(med.tipo==='continuo') return true; const t=todayStr(); if(med.dataInicio && t<med.dataInicio) return false; if(med.dataFim && t>med.dataFim) return false; return true; };
 const esc = s => (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-// Resizes + compresses a photo before storing as base64, so a handful of photos
-// don't blow through the browser's localStorage quota (typically a few MB).
-function resizeImageFile(file, maxDim=1100, quality=0.78){
+// Photos live in IndexedDB, not localStorage: the quota is far larger (typically
+// hundreds of MB, vs ~5-10MB for localStorage), so photos can stay near full quality.
+const PHOTO_DB_NAME = 'ottoPhotosDB';
+function idbOpen(){
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open(PHOTO_DB_NAME, 1);
+    req.onupgradeneeded = ()=> req.result.createObjectStore('photos');
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbPutPhoto(id, blob){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction('photos','readwrite');
+    tx.objectStore('photos').put(blob, id);
+    tx.oncomplete = ()=> resolve(true);
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+async function idbGetPhoto(id){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction('photos','readonly');
+    const req = tx.objectStore('photos').get(id);
+    req.onsuccess = ()=> resolve(req.result || null);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbDeletePhoto(id){
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction('photos','readwrite');
+    tx.objectStore('photos').delete(id);
+    tx.oncomplete = ()=> resolve(true);
+    tx.onerror = ()=> reject(tx.error);
+  });
+}
+
+// Resizes + compresses a photo, returning a Blob (more memory-efficient than base64
+// for IndexedDB). Near-full quality now that storage isn't the constraint it was.
+function resizeImageFile(file, maxDim=1600, quality=0.85){
   return new Promise((resolve, reject)=>{
     const reader = new FileReader();
     reader.onload = ()=>{
@@ -256,7 +295,7 @@ function resizeImageFile(file, maxDim=1100, quality=0.78){
         const canvas = document.createElement('canvas');
         canvas.width=w; canvas.height=h;
         canvas.getContext('2d').drawImage(img,0,0,w,h);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        canvas.toBlob(blob=> resolve(blob), 'image/jpeg', quality);
       };
       img.onerror = reject;
       img.src = reader.result;
@@ -495,7 +534,7 @@ function showWarning(msg){
 // ================= ENTRY MODAL =================
 function emptyForm(cat){
   const now = new Date();
-  return { title:'', quantidade:'', dateD: todayStr(), dateT: `${pad(now.getHours())}:${pad(now.getMinutes())}`, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:EXAME_TIPOS[0], photo:'' };
+  return { title:'', quantidade:'', dateD: todayStr(), dateT: `${pad(now.getHours())}:${pad(now.getMinutes())}`, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:EXAME_TIPOS[0], photo:'', photoBlob:null, photoId:'', removedPhoto:false };
 }
 
 function openEntryModal(category, editId){
@@ -506,7 +545,7 @@ function openEntryModal(category, editId){
     dateD: editing.date.slice(0,10), dateT: fmtTime(editing.date),
     note: editing.note||'', value: editing.value ?? '', gravidade: editing.gravidade||'',
     comoComeu: editing.comoComeu||'', clinica: editing.clinica||'', tipoExame: editing.tipoExame||EXAME_TIPOS[0],
-    photo: editing.photo||''
+    photo: editing.photo||'', photoBlob:null, photoId: editing.photoId||'', removedPhoto:false
   } : emptyForm();
 
   const cat = CATEGORIES[category];
@@ -660,14 +699,20 @@ function openEntryModal(category, editId){
       const file = e.target.files[0];
       if(!file) return;
       try{
-        form.photo = await resizeImageFile(file);
+        const blob = await resizeImageFile(file);
+        form.photoBlob = blob;
+        form.photo = URL.createObjectURL(blob);
+        form.removedPhoto = false;
       }catch(err){
         console.error('Erro ao processar foto', err);
         showWarning('Não consegui processar essa foto. Tenta outra.');
       }
       refreshBody();
     });
-    if(removeBtn) removeBtn.addEventListener('click', ()=>{ form.photo=''; refreshBody(); });
+    if(removeBtn) removeBtn.addEventListener('click', ()=>{
+      form.photo=''; form.photoBlob=null; form.removedPhoto = !!form.photoId;
+      refreshBody();
+    });
     if(thumb) thumb.addEventListener('click', ()=> openLightbox(form.photo));
   }
   function refreshBody(){ document.getElementById('bodyEntry').innerHTML = fieldsHtml(); wireBodyOnly(); toggleSave(); }
@@ -702,12 +747,31 @@ function openEntryModal(category, editId){
     } else closeModal();
   }
 
-  function save(){
+  async function save(){
     const dateIso = new Date(`${form.dateD}T${form.dateT}`).toISOString();
     let entry = { id: editing? editing.id : genId(), category, date: dateIso, note: form.note.trim(), createdAt: editing? editing.createdAt : Date.now() };
     if(category==='peso'){ entry.value = parseFloat(form.value); entry.title='Peso'; }
     else if(category==='exame'){ entry.title=form.tipoExame; entry.tipoExame=form.tipoExame; }
-    else if(category==='intercorrencia'){ entry.title=form.title.trim(); entry.gravidade=form.gravidade; if(form.photo) entry.photo=form.photo; }
+    else if(category==='intercorrencia'){
+      entry.title=form.title.trim(); entry.gravidade=form.gravidade;
+      if(form.photoBlob){
+        const newId = genId();
+        try{
+          await idbPutPhoto(newId, form.photoBlob);
+          entry.photoId = newId;
+          if(editing && editing.photoId && editing.photoId!==newId) idbDeletePhoto(editing.photoId).catch(()=>{});
+        }catch(err){
+          console.error('Erro ao salvar foto', err);
+          showWarning('Não consegui salvar a foto, mas o resto do registro foi salvo.');
+        }
+      } else if(form.photoId && !form.removedPhoto){
+        entry.photoId = form.photoId;
+      } else if(form.removedPhoto && editing && editing.photoId){
+        idbDeletePhoto(editing.photoId).catch(()=>{});
+      } else if(!form.removedPhoto && editing && editing.photo){
+        entry.photo = editing.photo; // legacy entries saved before the IndexedDB migration
+      }
+    }
     else if(category==='consulta'){ entry.title=form.title.trim(); entry.clinica=form.clinica.trim(); }
     else if(category==='alimentacao'){ entry.title=form.title.trim(); entry.comoComeu=form.comoComeu; entry.quantidade=form.quantidade.trim(); }
     else entry.title=form.title.trim();
@@ -730,6 +794,15 @@ function openEntryModal(category, editId){
   }
 
   render();
+
+  if(editing && editing.photoId){
+    idbGetPhoto(editing.photoId).then(blob=>{
+      if(blob && document.getElementById('bodyEntry')){
+        form.photo = URL.createObjectURL(blob);
+        refreshBody();
+      }
+    }).catch(err=> console.error('Erro ao carregar foto', err));
+  }
 }
 
 function closeModal(){ document.getElementById('modalHost').innerHTML=''; }
@@ -749,6 +822,8 @@ function openConfirmDelete(id){
   document.getElementById('ovDel').addEventListener('click', e=>{ if(e.target.id==='ovDel') closeModal(); });
   document.getElementById('btnCancelDel').addEventListener('click', closeModal);
   document.getElementById('btnConfirmDel').addEventListener('click', ()=>{
+    const toRemove = entries.find(e=>e.id===id);
+    if(toRemove && toRemove.photoId) idbDeletePhoto(toRemove.photoId).catch(()=>{});
     entries = entries.filter(e=>e.id!==id);
     persistEntries();
     closeModal();
