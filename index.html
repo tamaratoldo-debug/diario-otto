@@ -45,6 +45,13 @@
 
   .med-row{display:flex; align-items:center; gap:12px; background:#FBFAF7; border-radius:12px; padding:10px 12px; margin-bottom:8px}
   .pending-checkbox{width:18px; height:18px; border-radius:50%; border:2px solid #7FB89A; flex-shrink:0; display:inline-block}
+  .photo-preview{position:relative; display:inline-block; margin-top:2px}
+  .photo-preview img{width:100px; height:100px; object-fit:cover; border-radius:10px; display:block; border:1px solid #E5E0D4}
+  .photo-remove{position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:999px; background:#A8473A; border:2px solid #fff; display:flex; align-items:center; justify-content:center; cursor:pointer}
+  .entry-thumb{width:44px; height:44px; object-fit:cover; border-radius:8px; margin-top:6px; border:1px solid #F1EEE6}
+  .lightbox{position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:60; display:flex; align-items:center; justify-content:center; padding:20px}
+  .lightbox img{max-width:100%; max-height:100%; border-radius:8px}
+  .lightbox-close{position:absolute; top:20px; right:20px; width:40px; height:40px; border-radius:999px; background:rgba(255,255,255,.15); border:none; display:flex; align-items:center; justify-content:center}
   .med-row:last-child{margin-bottom:0}
   .check-btn{width:34px; height:34px; border-radius:999px; border:none; background:var(--c-remedio); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer}
   .med-name{font-size:.9rem; font-weight:500}
@@ -213,7 +220,8 @@ const ICONS = {
   x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
   trash:'<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
-  paw:'<path d="M11 5.172C11 3.782 9.423 2.679 7.5 3c-2.823.47-4.113 6.006-4 7 .08.703 1.725 1.722 3.656 1a2.5 2.5 0 1 1 3.626-3.256"/><circle cx="18" cy="7" r="1"/><circle cx="20.5" cy="10.5" r="1"/><circle cx="12" cy="21" r="1"/><path d="M9 8c0 2 1 3 2.5 3.5S13 15 13 17c0 2-1 3-2.5 3.5"/>'
+  paw:'<path d="M11 5.172C11 3.782 9.423 2.679 7.5 3c-2.823.47-4.113 6.006-4 7 .08.703 1.725 1.722 3.656 1a2.5 2.5 0 1 1 3.626-3.256"/><circle cx="18" cy="7" r="1"/><circle cx="20.5" cy="10.5" r="1"/><circle cx="12" cy="21" r="1"/><path d="M9 8c0 2 1 3 2.5 3.5S13 15 13 17c0 2-1 3-2.5 3.5"/>',
+  camera:'<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="3.5"/>'
 };
 function icon(name, size=16, stroke='currentColor'){
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
@@ -232,6 +240,30 @@ const fmtDateShort = ds=>{ if(!ds) return '?'; const [y,m,d]=ds.split('-'); retu
 const isSameDay = (iso, ds)=>{ const d=new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`===ds; };
 const isMedActiveToday = med=>{ if(med.tipo==='continuo') return true; const t=todayStr(); if(med.dataInicio && t<med.dataInicio) return false; if(med.dataFim && t>med.dataFim) return false; return true; };
 const esc = s => (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// Resizes + compresses a photo before storing as base64, so a handful of photos
+// don't blow through the browser's localStorage quota (typically a few MB).
+function resizeImageFile(file, maxDim=700, quality=0.65){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w=img.width, h=img.height;
+        if(w>h){ if(w>maxDim){ h=Math.round(h*maxDim/w); w=maxDim; } }
+        else { if(h>maxDim){ w=Math.round(w*maxDim/h); h=maxDim; } }
+        const canvas = document.createElement('canvas');
+        canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 // ---------- state ----------
 let entries = store.get('otto:entries', []);
@@ -433,6 +465,7 @@ function renderTimeline(){
           </div>
           ${badge}
           ${sub?`<div class="entry-sub">${esc(sub)}</div>`:''}
+          ${e.photo?`<span class="entry-thumb-wrap" data-photo="${e.photo}"><img class="entry-thumb" src="${e.photo}"/></span>`:''}
         </button>`;
       }).join('');
       html += `</div></div>`;
@@ -441,9 +474,17 @@ function renderTimeline(){
   host.innerHTML = html;
   host.querySelectorAll('[data-id]').forEach(b=> b.addEventListener('click', ()=> openEntryModal(null, b.dataset.id)));
   host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med)));
+  host.querySelectorAll('.entry-thumb-wrap').forEach(w=> w.addEventListener('click', (ev)=>{ ev.stopPropagation(); openLightbox(w.dataset.photo); }));
 }
 
 function renderAll(){ renderHero(); renderTimeline(); }
+
+function openLightbox(src){
+  const host = document.getElementById('modalHost');
+  host.innerHTML = `<div class="lightbox" id="ovLightbox"><button class="lightbox-close" id="closeLightbox">${icon('x',20,'#fff')}</button><img src="${src}"/></div>`;
+  document.getElementById('ovLightbox').addEventListener('click', (e)=>{ if(e.target.id==='ovLightbox') closeModal(); });
+  document.getElementById('closeLightbox').addEventListener('click', closeModal);
+}
 
 // ---------- warning banner ----------
 function showWarning(msg){
@@ -454,7 +495,7 @@ function showWarning(msg){
 // ================= ENTRY MODAL =================
 function emptyForm(cat){
   const now = new Date();
-  return { title:'', quantidade:'', dateD: todayStr(), dateT: `${pad(now.getHours())}:${pad(now.getMinutes())}`, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:EXAME_TIPOS[0] };
+  return { title:'', quantidade:'', dateD: todayStr(), dateT: `${pad(now.getHours())}:${pad(now.getMinutes())}`, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:EXAME_TIPOS[0], photo:'' };
 }
 
 function openEntryModal(category, editId){
@@ -464,7 +505,8 @@ function openEntryModal(category, editId){
     title: editing.title||'', quantidade: editing.quantidade||'',
     dateD: editing.date.slice(0,10), dateT: fmtTime(editing.date),
     note: editing.note||'', value: editing.value ?? '', gravidade: editing.gravidade||'',
-    comoComeu: editing.comoComeu||'', clinica: editing.clinica||'', tipoExame: editing.tipoExame||EXAME_TIPOS[0]
+    comoComeu: editing.comoComeu||'', clinica: editing.clinica||'', tipoExame: editing.tipoExame||EXAME_TIPOS[0],
+    photo: editing.photo||''
   } : emptyForm();
 
   const cat = CATEGORIES[category];
@@ -500,7 +542,12 @@ function openEntryModal(category, editId){
       h += `<div class="field"><label>O que aconteceu</label><input id="f_title" value="${esc(form.title)}" placeholder="ex: Vômito, coceira..."/>
         <div class="pickgrid" id="icPick" style="margin-top:6px">${suggestChips('intercorrencia', form.title)}</div>
       </div>
-      <div class="field"><label>Gravidade (opcional)</label><div class="row2">${GRAVIDADES.map(g=>`<button type="button" class="pick-btn ${form.gravidade===g?'sel':''}" style="flex:1; ${form.gravidade===g?`background:${cat.hex}`:''}" data-g="${g}">${g}</button>`).join('')}</div></div>`;
+      <div class="field"><label>Gravidade (opcional)</label><div class="row2">${GRAVIDADES.map(g=>`<button type="button" class="pick-btn ${form.gravidade===g?'sel':''}" style="flex:1; ${form.gravidade===g?`background:${cat.hex}`:''}" data-g="${g}">${g}</button>`).join('')}</div></div>
+      <div class="field"><label>Foto (opcional)</label>
+        ${form.photo ? `<div class="photo-preview"><img src="${form.photo}"/><button type="button" id="removePhoto" class="photo-remove">${icon('x',13,'#fff')}</button></div>`
+          : `<button type="button" id="addPhotoBtn" class="add-trigger">${icon('camera',15)} Adicionar foto</button>`}
+        <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none"/>
+      </div>`;
     }
     if(category==='consulta'){
       h += `<div class="field"><label>Motivo</label><input id="f_title" value="${esc(form.title)}" placeholder="ex: Consulta de rotina, retorno..."/>
@@ -585,6 +632,7 @@ function openEntryModal(category, editId){
 
     const gravRow = document.querySelectorAll('[data-g]');
     gravRow.forEach(b=> b.addEventListener('click', ()=>{ form.gravidade = form.gravidade===b.dataset.g ? '' : b.dataset.g; refreshBody(); }));
+    wirePhoto();
 
     const exPick = document.getElementById('exPick');
     if(exPick) exPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.tipoExame=b.dataset.t; refreshBody(); }));
@@ -601,6 +649,25 @@ function openEntryModal(category, editId){
     // acceptable tradeoff here given text fields are short.
   }
   function toggleSave(){ document.getElementById('btnSaveEntry').disabled = !canSave(); }
+
+  function wirePhoto(){
+    const addBtn = document.getElementById('addPhotoBtn');
+    const input = document.getElementById('photoInput');
+    const removeBtn = document.getElementById('removePhoto');
+    if(addBtn && input) addBtn.addEventListener('click', ()=> input.click());
+    if(input) input.addEventListener('change', async (e)=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      try{
+        form.photo = await resizeImageFile(file);
+      }catch(err){
+        console.error('Erro ao processar foto', err);
+        showWarning('Não consegui processar essa foto. Tenta outra.');
+      }
+      refreshBody();
+    });
+    if(removeBtn) removeBtn.addEventListener('click', ()=>{ form.photo=''; refreshBody(); });
+  }
   function refreshBody(){ document.getElementById('bodyEntry').innerHTML = fieldsHtml(); wireBodyOnly(); toggleSave(); }
   function wireBodyOnly(){
     const t = document.getElementById('f_title'); if(t) t.addEventListener('input', e=>{ form.title=e.target.value; toggleSave(); });
@@ -616,6 +683,7 @@ function openEntryModal(category, editId){
     const openMM = document.getElementById('openMedMgr'); if(openMM) openMM.addEventListener('click', ()=> openMedManager(()=>{ refreshBody(); }));
     const comoList = document.getElementById('comoList'); if(comoList) comoList.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.comoComeu = form.comoComeu===b.dataset.v ? '' : b.dataset.v; refreshBody(); }));
     document.querySelectorAll('[data-g]').forEach(b=> b.addEventListener('click', ()=>{ form.gravidade = form.gravidade===b.dataset.g ? '' : b.dataset.g; refreshBody(); }));
+    wirePhoto();
     const exPick = document.getElementById('exPick'); if(exPick) exPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.tipoExame=b.dataset.t; refreshBody(); }));
     document.querySelectorAll('[data-sugg]').forEach(b=> b.addEventListener('click', ()=>{ const kind=b.dataset.sugg, val=b.dataset.val; if(kind==='clinica') form.clinica=val; else form.title=val; refreshBody(); }));
   }
@@ -637,7 +705,7 @@ function openEntryModal(category, editId){
     let entry = { id: editing? editing.id : genId(), category, date: dateIso, note: form.note.trim(), createdAt: editing? editing.createdAt : Date.now() };
     if(category==='peso'){ entry.value = parseFloat(form.value); entry.title='Peso'; }
     else if(category==='exame'){ entry.title=form.tipoExame; entry.tipoExame=form.tipoExame; }
-    else if(category==='intercorrencia'){ entry.title=form.title.trim(); entry.gravidade=form.gravidade; }
+    else if(category==='intercorrencia'){ entry.title=form.title.trim(); entry.gravidade=form.gravidade; if(form.photo) entry.photo=form.photo; }
     else if(category==='consulta'){ entry.title=form.title.trim(); entry.clinica=form.clinica.trim(); }
     else if(category==='alimentacao'){ entry.title=form.title.trim(); entry.comoComeu=form.comoComeu; entry.quantidade=form.quantidade.trim(); }
     else entry.title=form.title.trim();
