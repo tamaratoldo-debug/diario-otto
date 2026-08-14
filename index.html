@@ -546,7 +546,7 @@ function openEntryModal(category, editId){
       <div class="field"><label>Foto (opcional)</label>
         ${form.photo ? `<div class="photo-preview"><img src="${form.photo}"/><button type="button" id="removePhoto" class="photo-remove">${icon('x',13,'#fff')}</button></div>`
           : `<button type="button" id="addPhotoBtn" class="add-trigger">${icon('camera',15)} Adicionar foto</button>`}
-        <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none"/>
+        <input type="file" id="photoInput" accept="image/*" style="display:none"/>
       </div>`;
     }
     if(category==='consulta'){
