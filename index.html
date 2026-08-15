@@ -100,6 +100,7 @@
   .field{margin-bottom:14px}
   .field label{display:block; font-size:.72rem; font-weight:500; color:var(--ink-muted); margin-bottom:6px}
   .field input, .field textarea, .field select{width:100%; padding:10px 12px; border-radius:10px; border:1px solid #E5E0D4; font-size:16px; color:var(--ink); background:#FBFAF7; font-family:inherit}
+  .field input[type="time"], .field input[type="date"]{text-align:left}
   .field textarea{min-height:70px; resize:vertical}
   .row2{display:flex; gap:8px}
   .row2 .field{flex:1}
@@ -1129,6 +1130,7 @@ function openMedManager(onDone){
   const host = document.getElementById('modalHost');
   let list = meds.slice();
   let adding = false;
+  let editingId = null;
   let draft = {name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horario:''};
 
   function render(){
@@ -1136,8 +1138,8 @@ function openMedManager(onDone){
       <div class="sheet" style="max-height:90vh">
         <div class="sheet-head"><div class="sheet-title">Meus remédios</div><button class="icon-btn" id="closeMed">${icon('x',18)}</button></div>
         <div class="sheet-body">
-          <div class="hint" style="margin-bottom:12px">Cadastre uma vez. Remédios contínuos aparecem todo dia no checklist; pontuais só entre a data de início e fim.</div>
-          <div id="medList">${list.map(m=>`<div class="manager-item"><div><div class="name">${esc(m.name)}</div><div class="sub">${m.tipo==='continuo'?'Contínuo':`Pontual · ${fmtDateShort(m.dataInicio)} a ${fmtDateShort(m.dataFim)}`}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}</div></div><button class="del-btn" data-id="${m.id}">${icon('trash',14,'var(--ink-muted)')}</button></div>`).join('') || (adding?'':'<div class="hint" style="text-align:center; padding:16px 0">Nada cadastrado ainda.</div>')}</div>
+          <div class="hint" style="margin-bottom:12px">Cadastre uma vez. Toque num remédio pra editar. Remédios contínuos aparecem todo dia no checklist; pontuais só entre a data de início e fim.</div>
+          <div id="medList">${list.map(m=>`<div class="manager-item" data-open="${m.id}" style="cursor:pointer"><div><div class="name">${esc(m.name)}</div><div class="sub">${m.tipo==='continuo'?'Contínuo':`Pontual · ${fmtDateShort(m.dataInicio)} a ${fmtDateShort(m.dataFim)}`}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}</div></div><button class="del-btn" data-id="${m.id}">${icon('trash',14,'var(--ink-muted)')}</button></div>`).join('') || (adding?'':'<div class="hint" style="text-align:center; padding:16px 0">Nada cadastrado ainda.</div>')}</div>
           <div id="addArea"></div>
         </div>
         <div class="sheet-foot"><button class="btn-primary" id="doneMedBtn">Pronto</button></div>
@@ -1146,7 +1148,21 @@ function openMedManager(onDone){
     document.getElementById('ovMed').addEventListener('click', e=>{ if(e.target.id==='ovMed') finish(); });
     document.getElementById('closeMed').addEventListener('click', finish);
     document.getElementById('doneMedBtn').addEventListener('click', finish);
-    document.querySelectorAll('#medList .del-btn').forEach(b=> b.addEventListener('click', ()=>{ list = list.filter(m=>m.id!==b.dataset.id); render(); }));
+    document.querySelectorAll('#medList .del-btn').forEach(b=> b.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      list = list.filter(m=>m.id!==b.dataset.id);
+      if(editingId===b.dataset.id){ adding=false; editingId=null; }
+      render();
+    }));
+    document.querySelectorAll('#medList .manager-item').forEach(row=> row.addEventListener('click', ()=>{
+      const m = list.find(x=>x.id===row.dataset.open);
+      if(!m) return;
+      editingId = m.id;
+      adding = true;
+      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horario:m.horario||'' };
+      renderAddArea();
+      document.getElementById('addArea').scrollIntoView({behavior:'smooth', block:'center'});
+    }));
     renderAddArea();
   }
 
@@ -1154,10 +1170,11 @@ function openMedManager(onDone){
     const area = document.getElementById('addArea');
     if(!adding){
       area.innerHTML = `<button class="add-trigger" id="startAdd">${icon('plus',15)} Cadastrar remédio</button>`;
-      document.getElementById('startAdd').addEventListener('click', ()=>{ adding=true; draft={name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horario:''}; renderAddArea(); });
+      document.getElementById('startAdd').addEventListener('click', ()=>{ adding=true; editingId=null; draft={name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horario:''}; renderAddArea(); });
       return;
     }
     area.innerHTML = `<div class="add-form">
+      ${editingId? `<div class="hint" style="margin-bottom:8px; font-weight:600; color:${CATEGORIES.remedio.hex}">Editando</div>` : ''}
       <div class="field"><label>Nome do remédio</label><input id="d_name" value="${esc(draft.name)}" placeholder="ex: Omeprazol"/></div>
       <div class="field"><label>Tipo</label><div class="tipo-toggle">
         <button data-tipo="continuo" class="${draft.tipo==='continuo'?'sel':''}">Contínuo</button>
@@ -1173,7 +1190,7 @@ function openMedManager(onDone){
       </div>
       <div style="display:flex; gap:8px; margin-top:4px">
         <button class="btn-secondary" id="cancelAdd" style="flex:1">Cancelar</button>
-        <button class="btn-primary" id="confirmAdd" ${draft.name.trim()?'':'disabled'}>Adicionar</button>
+        <button class="btn-primary" id="confirmAdd" ${draft.name.trim()?'':'disabled'}>${editingId?'Salvar':'Adicionar'}</button>
       </div>
     </div>`;
     document.getElementById('d_name').addEventListener('input', e=>{ draft.name=e.target.value; document.getElementById('confirmAdd').disabled = !draft.name.trim(); });
@@ -1182,15 +1199,21 @@ function openMedManager(onDone){
     const df = document.getElementById('d_fim'); if(df) df.addEventListener('input', e=> draft.dataFim=e.target.value);
     document.getElementById('d_dose').addEventListener('input', e=> draft.dose=e.target.value);
     document.getElementById('d_horario').addEventListener('input', e=> draft.horario=e.target.value);
-    document.getElementById('cancelAdd').addEventListener('click', ()=>{ adding=false; renderAddArea(); });
+    document.getElementById('cancelAdd').addEventListener('click', ()=>{ adding=false; editingId=null; renderAddArea(); });
     document.getElementById('confirmAdd').addEventListener('click', ()=>{
       const n = draft.name.trim(); if(!n) return;
-      if(list.some(m=> m.name.toLowerCase()===n.toLowerCase())){
+      const duplicate = list.some(m=> m.name.toLowerCase()===n.toLowerCase() && m.id!==editingId);
+      if(duplicate){
         showWarning(`"${n}" já está cadastrado. Edite o existente em vez de duplicar.`);
         return;
       }
-      list.push({ id:genId(), name:n, tipo:draft.tipo, dataInicio: draft.tipo==='pontual'?draft.dataInicio:'', dataFim: draft.tipo==='pontual'?draft.dataFim:'', dose:draft.dose.trim(), horario:draft.horario });
-      adding=false;
+      const payload = { name:n, tipo:draft.tipo, dataInicio: draft.tipo==='pontual'?draft.dataInicio:'', dataFim: draft.tipo==='pontual'?draft.dataFim:'', dose:draft.dose.trim(), horario:draft.horario };
+      if(editingId){
+        list = list.map(m=> m.id===editingId ? { ...m, ...payload } : m);
+      } else {
+        list.push({ id:genId(), ...payload });
+      }
+      adding=false; editingId=null;
       render();
     });
   }
