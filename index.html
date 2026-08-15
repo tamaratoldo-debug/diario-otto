@@ -36,7 +36,8 @@
   .hero-meta{font-size:.78rem; color:rgba(255,255,255,.85); margin-top:5px}
 
   .quick-card{background:#fff; border-radius:22px; padding:18px 12px; margin-top:14px; box-shadow:0 1px 2px rgba(20,24,40,0.05)}
-  .quick-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px 4px}
+  .quick-grid{display:flex; flex-wrap:wrap; justify-content:center; gap:16px 10px}
+  .quick-grid button{width:74px}
   .quick-grid button{background:none; border:none; padding:0; display:flex; flex-direction:column; align-items:center; gap:7px; font-family:inherit; cursor:pointer}
   .quick-grid .icon-circle{width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0}
   .quick-grid .lbl{font-size:.66rem; font-weight:500; color:var(--ink); text-align:center; line-height:1.15}
@@ -169,7 +170,7 @@ const store = {
 
 // ---------- config ----------
 const CATEGORIES = {
-  alimentacao:{label:'Alimentação', short:'Comeu', color:'var(--c-alimentacao)', hex:'#D98A2E', bgHex:'#FBEEDB', icon:'utensils'},
+  alimentacao:{label:'Alimentação', short:'Alimentação', color:'var(--c-alimentacao)', hex:'#D98A2E', bgHex:'#FBEEDB', icon:'utensils'},
   remedio:{label:'Remédio', short:'Remédio', color:'var(--c-remedio)', hex:'#3EAE8A', bgHex:'#E0F4EC', icon:'pill'},
   peso:{label:'Peso', short:'Peso', color:'var(--c-peso)', hex:'#4C6FFF', bgHex:'#E7ECFF', icon:'scale'},
   intercorrencia:{label:'Intercorrência', short:'Intercorrência', color:'var(--c-intercorrencia)', hex:'#E0604A', bgHex:'#FBE6E1', icon:'alert'},
@@ -193,7 +194,7 @@ const ICONS = {
   pill:'<path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/>',
   scale:'<path d="M12 3v18M8 6l-6 12M16 6l6 12M2 18h12M10 18h12M6 6h4M14 6h4"/>',
   alert:'<path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4M12 17h.01"/>',
-  stethoscope:'<path d="M4.8 2.3A.3.3 0 1 0 5.397 2 .3.3 0 0 0 4.8 2.3M8.5 2v9a4.5 4.5 0 0 1-4.5 4.5m0 0a4.5 4.5 0 0 1-4.5-4.5V2M4 15.5v2a10 10 0 0 0 10 10h1a2 2 0 0 0 2-2v-1.5a2 2 0 0 0-4 0v.9"/>',
+  stethoscope:'<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.29 1.51 4.04 3 5.5l7 7Z"/><path d="M3.22 8.5h3l1.5-2.5 2.5 5 1.5-2.5h5"/>',
   syringe:'<path d="m18 2 4 4M14.5 5.5 3 17l-1 4 4-1L17.5 8.5M9 11l4 4M4 21l3-3"/>',
   flask:'<path d="M10 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 14 22H6.5a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10.5 8V2M6.453 15h11.094M8.5 2h7"/>',
   check:'<polyline points="20 6 9 17 4 12"/>',
@@ -400,7 +401,7 @@ function renderQuickActions(){
   host.innerHTML = CATEGORY_ORDER.map(key=>{
     const cat = CATEGORIES[key];
     return `<button data-cat="${key}">
-      <span class="icon-circle" style="background:${cat.bgHex}">${icon(cat.icon,20,cat.hex)}</span>
+      <span class="icon-circle" style="background:#EEF0F5">${icon(cat.icon,20,'#3D4250')}</span>
       <span class="lbl">${cat.short}</span>
     </button>`;
   }).join('');
