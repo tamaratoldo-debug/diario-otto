@@ -64,6 +64,15 @@
   .chip-filter.active{border:none; color:#fff}
 
   .month-label{font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted); margin:16px 4px 8px}
+  .day-squares-row{display:flex; gap:8px; overflow-x:auto; padding:2px 4px 10px; scrollbar-width:none}
+  .day-squares-row::-webkit-scrollbar{display:none}
+  .day-square{flex-shrink:0; width:46px; display:flex; flex-direction:column; align-items:center; gap:3px; background:#fff; border:1px solid #EFEBE1; border-radius:12px; padding:8px 4px 7px; font-family:inherit; cursor:pointer}
+  .day-square.active{background:var(--ink); border-color:var(--ink)}
+  .day-square .ds-n{font-weight:700; font-size:1.05rem; line-height:1; color:var(--ink)}
+  .day-square.active .ds-n{color:#fff}
+  .day-square .ds-w{font-size:.6rem; font-weight:500; color:var(--ink-muted); text-transform:uppercase}
+  .day-square.active .ds-w{color:rgba(255,255,255,.65)}
+  .day-square .ds-dots{display:flex; gap:2px; min-height:5px; margin-top:1px}
   .day-card{background:#fff; border-radius:12px; padding:12px; display:flex; gap:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); margin-bottom:8px}
   .day-num{display:flex; flex-direction:column; align-items:center; width:44px; flex-shrink:0; padding-top:2px}
   .day-num .n{font-weight:700; font-size:1.3rem; line-height:1}
@@ -236,6 +245,7 @@ const todayStr = ()=>{ const d=new Date(); return `${d.getFullYear()}-${pad(d.ge
 const fmtDate = iso=> new Date(iso).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}).replace('.','');
 const fmtDay = iso=> new Date(iso).getDate();
 const fmtMonthShort = iso=> new Date(iso).toLocaleDateString('pt-BR',{month:'short'}).replace('.','').toUpperCase();
+const fmtWeekdayShort = iso=> new Date(iso).toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','').toLowerCase();
 const fmtTime = iso=> new Date(iso).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 const fmtMonthYear = iso=>{ const s=new Date(iso).toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); return s.charAt(0).toUpperCase()+s.slice(1); };
 const fmtDateShort = ds=>{ if(!ds) return '?'; const [y,m,d]=ds.split('-'); return `${d}/${m}/${y.slice(2)}`; };
@@ -374,6 +384,10 @@ let filter = 'todos';
 let medsExpanded = false;
 let collapsedMonths = new Set(store.get('otto:collapsed-months', []));
 function persistCollapsedMonths(){ writeStore('otto:collapsed-months', [...collapsedMonths]); }
+// Dias colapsados viram quadradinhos; hoje sempre nasce expandido a cada
+// abertura do app (não persiste — decisão consciente, pra sempre abrir já
+// mostrando o checklist de remédios do dia sem precisar tocar em nada).
+let expandedDays = new Set([new Date().toDateString()]);
 let search = '';
 let profilePhotoUrl = null;
 
@@ -564,6 +578,24 @@ function entrySubtitle(e){
   return e.note || '';
 }
 
+function entryRowHtml(e){
+  const cat = CATEGORIES[e.category];
+  let badge='';
+  if(e.category==='intercorrencia' && e.gravidade){
+    const bg = e.gravidade==='Grave'?'#A8473A20':e.gravidade==='Moderada'?'#D9A44120':'#8A837820';
+    const fg = e.gravidade==='Grave'?'#A8473A':e.gravidade==='Moderada'?'#B5842E':'var(--ink-muted)';
+    badge = `<span class="badge" style="background:${bg}; color:${fg}; flex-shrink:0">${e.gravidade}</span>`;
+  }
+  const sub = entrySubtitle(e);
+  return `<button class="entry-row" data-id="${e.id}">
+    <div class="entry-top">
+      <div class="entry-title"><span style="color:${cat.hex}; display:flex">${icon(cat.icon,13,cat.hex)}</span><span style="flex:1; min-width:0">${esc(e.title)}</span>${badge}</div>
+      <span class="entry-time">${fmtTime(e.date)}</span>
+    </div>
+    ${sub?`<div class="entry-sub">${esc(sub)}</div>`:''}
+  </button>`;
+}
+
 function renderTimeline(){
   let list = entries.slice();
   if(filter!=='todos') list = list.filter(e=>e.category===filter);
@@ -628,37 +660,45 @@ function renderTimeline(){
       <span>${month.key}</span>${icon(isCollapsed?'chevronDown':'chevronUp',13,'var(--ink-muted)')}
     </button>`;
     if(isCollapsed) continue;
+
+    let squaresHtml = '', expandedHtml = '';
     for(const day of month.days){
       const isToday = day.key===todayKey;
       const pendingHtml = isToday ? pendingRowsHtml(activeMedsToday) : '';
       if(day.items.length===0 && !pendingHtml) continue;
-      const dayNum = day.items[0] ? fmtDay(day.items[0].date) : new Date().getDate();
-      const dayMon = day.items[0] ? fmtMonthShort(day.items[0].date) : fmtMonthShort(new Date().toISOString());
-      html += `<div class="day-card"><div class="day-num"><div class="n">${dayNum}</div><div class="m">${dayMon}</div></div><div class="day-sep"></div><div class="entries-col">`;
-      html += pendingHtml;
-      html += day.items.map(e=>{
-        const cat = CATEGORIES[e.category];
-        let badge='';
-        if(e.category==='intercorrencia' && e.gravidade){
-          const bg = e.gravidade==='Grave'?'#A8473A20':e.gravidade==='Moderada'?'#D9A44120':'#8A837820';
-          const fg = e.gravidade==='Grave'?'#A8473A':e.gravidade==='Moderada'?'#B5842E':'var(--ink-muted)';
-          badge = `<span class="badge" style="background:${bg}; color:${fg}; flex-shrink:0">${e.gravidade}</span>`;
-        }
-        const sub = entrySubtitle(e);
-        return `<button class="entry-row" data-id="${e.id}">
-          <div class="entry-top">
-            <div class="entry-title"><span style="color:${cat.hex}; display:flex">${icon(cat.icon,13,cat.hex)}</span><span style="flex:1; min-width:0">${esc(e.title)}</span>${badge}</div>
-            <span class="entry-time">${fmtTime(e.date)}</span>
-          </div>
-          ${sub?`<div class="entry-sub">${esc(sub)}</div>`:''}
-        </button>`;
-      }).join('');
-      html += `</div></div>`;
+      const refDate = day.items[0] ? day.items[0].date : new Date().toISOString();
+      const dayNum = fmtDay(refDate);
+      const weekday = fmtWeekdayShort(refDate);
+      const isExpanded = expandedDays.has(day.key);
+      const dotCats = [...new Set(day.items.filter(e=>e.category!=='remedio').map(e=>e.category))];
+      const dotsHtml = dotCats.map(c=>`<span style="width:5px; height:5px; border-radius:50%; background:${CATEGORIES[c].hex}; display:inline-block"></span>`).join('');
+
+      squaresHtml += `<button class="day-square${isExpanded?' active':''}" data-daysquare="${esc(day.key)}">
+        <div class="ds-n">${dayNum}</div>
+        <div class="ds-w">${weekday}</div>
+        <div class="ds-dots">${dotsHtml}</div>
+      </button>`;
+
+      if(isExpanded){
+        expandedHtml += `<div class="day-card"><div class="day-num"><div class="n">${dayNum}</div><div class="m">${fmtMonthShort(refDate)}</div></div><div class="day-sep"></div><div class="entries-col">`;
+        expandedHtml += pendingHtml;
+        expandedHtml += day.items.map(entryRowHtml).join('');
+        expandedHtml += `</div></div>`;
+      }
+    }
+    if(squaresHtml){
+      html += `<div class="day-squares-row">${squaresHtml}</div>`;
+      html += expandedHtml;
     }
   }
   host.innerHTML = html;
   host.querySelectorAll('[data-id]').forEach(b=> b.addEventListener('click', ()=> openEntryModal(null, b.dataset.id)));
   host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med)));
+  host.querySelectorAll('[data-daysquare]').forEach(b=> b.addEventListener('click', ()=>{
+    const key = b.dataset.daysquare;
+    if(expandedDays.has(key)) expandedDays.delete(key); else expandedDays.add(key);
+    renderTimeline();
+  }));
   const medsToggle = document.getElementById('medsSummaryToggle');
   if(medsToggle) medsToggle.addEventListener('click', ()=>{ medsExpanded = !medsExpanded; renderTimeline(); });
   host.querySelectorAll('[data-month]').forEach(b=> b.addEventListener('click', ()=>{
