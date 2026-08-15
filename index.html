@@ -707,7 +707,15 @@ function renderTimeline(){
     if(card) card.style.display = nowExpanded ? '' : 'none';
     if(aboveViewport){
       const newHeight = document.documentElement.scrollHeight;
-      window.scrollBy(0, newHeight - prevHeight);
+      const target = window.scrollY + (newHeight - prevHeight);
+      // Força essa posição por alguns quadros seguidos, caso a rolagem por
+      // inércia do iOS ainda esteja em andamento e tente sobrescrever o ajuste.
+      let frames = 0;
+      (function enforce(){
+        window.scrollTo(0, target);
+        frames++;
+        if(frames < 18) requestAnimationFrame(enforce);
+      })();
     }
   }));
   const medsToggle = document.getElementById('medsSummaryToggle');
