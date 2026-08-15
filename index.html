@@ -368,6 +368,8 @@ if(!settings.sheetLink){
 }
 let filter = 'todos';
 let medsExpanded = false;
+let collapsedMonths = new Set(store.get('otto:collapsed-months', []));
+function persistCollapsedMonths(){ writeStore('otto:collapsed-months', [...collapsedMonths]); }
 let search = '';
 let profilePhotoUrl = null;
 
@@ -617,7 +619,11 @@ function renderTimeline(){
   }
 
   for(const month of months){
-    html += `<div class="month-label">${month.key}</div>`;
+    const isCollapsed = collapsedMonths.has(month.key);
+    html += `<button class="month-label" data-month="${esc(month.key)}" style="display:flex; align-items:center; justify-content:space-between; width:100%; background:none; border:none; cursor:pointer; font-family:inherit; padding:0">
+      <span>${month.key}</span>${icon(isCollapsed?'chevronDown':'chevronUp',13,'var(--ink-muted)')}
+    </button>`;
+    if(isCollapsed) continue;
     for(const day of month.days){
       const isToday = day.key===todayKey;
       const pendingHtml = isToday ? pendingRowsHtml(activeMedsToday) : '';
@@ -651,6 +657,12 @@ function renderTimeline(){
   host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med)));
   const medsToggle = document.getElementById('medsSummaryToggle');
   if(medsToggle) medsToggle.addEventListener('click', ()=>{ medsExpanded = !medsExpanded; renderTimeline(); });
+  host.querySelectorAll('[data-month]').forEach(b=> b.addEventListener('click', ()=>{
+    const key = b.dataset.month;
+    if(collapsedMonths.has(key)) collapsedMonths.delete(key); else collapsedMonths.add(key);
+    persistCollapsedMonths();
+    renderTimeline();
+  }));
 }
 
 function renderAll(){ renderHero(); renderTimeline(); }
