@@ -70,7 +70,7 @@
   .day-num .m{font-size:.65rem; font-weight:500; color:var(--ink-muted)}
   .day-sep{width:1px; background:#EFEBE1; align-self:stretch}
   .entries-col{flex:1; min-width:0}
-  .entry-row{width:100%; text-align:left; background:none; border:none; padding:10px 0; font-family:inherit; cursor:pointer; border-bottom:1px solid #F1EEE6}
+  .entry-row{width:100%; text-align:left; background:none; border:none; padding:10px 0; font-family:inherit; cursor:pointer; border-bottom:1px solid #F1EEE6; color:var(--ink)}
   .entry-row:last-child{border-bottom:none; padding-bottom:0}
   .entry-row:first-child{padding-top:0}
   .entry-top{display:flex; align-items:center; justify-content:space-between; gap:8px}
@@ -100,8 +100,9 @@
   .field{margin-bottom:14px}
   .field label{display:block; font-size:.72rem; font-weight:500; color:var(--ink-muted); margin-bottom:6px}
   .field input, .field textarea, .field select{width:100%; padding:10px 12px; border-radius:10px; border:1px solid #E5E0D4; font-size:16px; color:var(--ink); background:#FBFAF7; font-family:inherit; box-sizing:border-box}
-  .field input[type="time"]{text-align:left; -webkit-appearance:none; appearance:none; min-width:0; padding-right:38px; background-repeat:no-repeat; background-position:right 12px center; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238A8F9C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpolyline points='12 6 12 12 16 14'/%3E%3C/svg%3E")}
-  .field input[type="date"]{text-align:left; -webkit-appearance:none; appearance:none; min-width:0; padding-right:38px; background-repeat:no-repeat; background-position:right 12px center; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238A8F9C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='2'/%3E%3Cline x1='16' y1='2' x2='16' y2='6'/%3E%3Cline x1='8' y1='2' x2='8' y2='6'/%3E%3Cline x1='3' y1='10' x2='21' y2='10'/%3E%3C/svg%3E")}
+  .dt-wrap{position:relative}
+  .dt-display{width:100%; padding:10px 12px; border-radius:10px; border:1px solid #E5E0D4; font-size:16px; color:var(--ink); background:#FBFAF7; box-sizing:border-box; min-height:22px; display:flex; align-items:center; gap:8px; pointer-events:none}
+  .dt-native{position:absolute; inset:0; width:100%; height:100%; opacity:0; font-size:16px; border:none; margin:0; padding:0}
   .field textarea{min-height:70px; resize:vertical}
   .row2{display:flex; gap:8px}
   .row2 > *{min-width:0}
@@ -151,16 +152,18 @@
   </div>
 
   <div style="margin-top:20px; padding:0 4px">
-    <div class="search-box" id="searchBox" style="display:none; margin-bottom:10px">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-      <input id="searchInput" placeholder="Buscar registros..." />
-      <button id="searchCloseBtn" style="background:none; border:none; padding:2px; display:flex; flex-shrink:0">${'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ink-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'}</button>
-    </div>
     <div style="display:flex; align-items:center; gap:8px">
       <button id="searchToggleBtn" style="flex-shrink:0; width:34px; height:34px; border-radius:50%; border:1px solid #E2E4EA; background:transparent; display:flex; align-items:center; justify-content:center">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ink-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
       </button>
       <div class="filters" id="filterChips" style="margin-top:0"></div>
+    </div>
+    <div class="search-box" id="searchBox" style="display:none; margin-top:10px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="searchInput" placeholder="Buscar registros..." />
+      <button id="searchCloseBtn" style="background:none; border:none; padding:2px; display:flex; flex-shrink:0">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ink-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
     </div>
   </div>
 
@@ -208,6 +211,8 @@ const ICONS = {
   syringe:'<path d="m18 2 4 4"/><path d="m17 7 3-3"/><path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5"/><path d="m9 11 4 4"/><path d="m5 19-3 3"/><path d="m14 4 6 6"/>',
   flask:'<path d="M10 2v7.31"/><path d="M14 9.3V2"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/><path d="M5.52 16h12.96"/>',
   check:'<polyline points="20 6 9 17 4 12"/>',
+  clock:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
   chevronDown:'<path d="m6 9 6 6 6-6"/>',
   chevronUp:'<path d="m18 15-6-6-6 6"/>',
   x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
@@ -232,10 +237,41 @@ const fmtMonthShort = iso=> new Date(iso).toLocaleDateString('pt-BR',{month:'sho
 const fmtTime = iso=> new Date(iso).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 const fmtMonthYear = iso=>{ const s=new Date(iso).toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); return s.charAt(0).toUpperCase()+s.slice(1); };
 const fmtDateShort = ds=>{ if(!ds) return '?'; const [y,m,d]=ds.split('-'); return `${d}/${m}/${y.slice(2)}`; };
+const fmtDateDMY = ds=>{ if(!ds) return ''; const [y,m,d]=ds.split('-'); return `${d}/${m}/${y}`; };
 const isSameDay = (iso, ds)=>{ const d=new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`===ds; };
 const toLocalDateStr = (d)=> `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const isMedActiveToday = med=>{ if(med.tipo==='continuo') return true; const t=todayStr(); if(med.dataInicio && t<med.dataInicio) return false; if(med.dataFim && t>med.dataFim) return false; return true; };
 const esc = s => (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+// Custom-styled date/time field: the real <input type="date/time"> stays in the DOM but invisible
+// (opacity:0) so tapping it still opens the native iOS picker exactly where it sits, while a
+// styled div underneath shows the value in our own compact format. This sidesteps Safari's
+// unstylable native date/time chrome entirely instead of fighting it with CSS overrides.
+function dtField(id, type, value, placeholder){
+  const iconName = type==='time' ? 'clock' : 'calendar';
+  const display = type==='time'
+    ? (value || `<span style="color:#B3AFA3">${placeholder||'Selecionar'}</span>`)
+    : (value ? fmtDateDMY(value) : `<span style="color:#B3AFA3">${placeholder||'Selecionar'}</span>`);
+  return `<div class="dt-wrap">
+    <div class="dt-display" id="${id}_display">${icon(iconName,15,'#8A8F9C')}<span>${display}</span></div>
+    <input type="${type}" id="${id}" class="dt-native" value="${value||''}"/>
+  </div>`;
+}
+function wireDtField(id, onChange){
+  const input = document.getElementById(id);
+  if(!input) return;
+  input.addEventListener('input', e=>{
+    const v = e.target.value;
+    if(onChange) onChange(v);
+    const disp = document.getElementById(id+'_display');
+    if(disp){
+      const type = input.type;
+      const text = type==='time' ? (v||'Selecionar') : (v? fmtDateDMY(v) : 'Selecionar');
+      const span = disp.querySelector('span');
+      if(span) span.textContent = text;
+    }
+  });
+}
 
 // Photos live in IndexedDB, not localStorage: the quota is far larger (typically
 // hundreds of MB, vs ~5-10MB for localStorage), so photos can stay near full quality.
@@ -440,7 +476,7 @@ function pendingRowsHtml(activeMeds){
   const sorted = activeMeds.slice().sort((a,b)=> (a.horario||'99:99').localeCompare(b.horario||'99:99'));
   const givenCount = sorted.filter(m=> dosesGivenToday(m).length>0).length;
 
-  const header = `<button class="entry-row" id="medsSummaryToggle">
+  const header = `<button class="entry-row" id="medsSummaryToggle" style="${medsExpanded?'border-bottom:none; padding-bottom:6px':''}">
     <div class="entry-top">
       <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>Remédios de hoje</span></div>
       <span style="display:flex; align-items:center; gap:4px; color:var(--ink-muted); font-size:.72rem; font-weight:600">${givenCount}/${sorted.length}${icon(medsExpanded?'chevronUp':'chevronDown',14,'var(--ink-muted)')}</span>
@@ -452,7 +488,7 @@ function pendingRowsHtml(activeMeds){
   const rows = sorted.map(m=>{
     const given = dosesGivenToday(m).length > 0;
     const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}`;
-    return `<button class="entry-row" data-med="${m.id}">
+    return `<button class="entry-row" data-med="${m.id}" style="border-bottom:1px solid rgba(0,0,0,.04)">
       <div class="entry-top">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
         <span class="pending-checkbox" style="${given?`background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}`:''}" aria-label="${given?'Dado hoje, toque pra desfazer':'Marcar como dado'}">${given?icon('check',11,'#fff'):''}</span>
@@ -461,7 +497,7 @@ function pendingRowsHtml(activeMeds){
     </button>`;
   }).join('');
 
-  return header + rows;
+  return `<div style="background:${CATEGORIES.remedio.hex}0F; border-radius:12px; padding:2px 10px; margin:2px 0 8px">${header}${rows}</div>`;
 }
 
 function toggleMedToday(medId){
@@ -800,8 +836,8 @@ function openEntryModal(category, editId){
       return h;
     }
     h += `<div class="field"><label>Data e hora</label><div class="row2">
-        <input id="f_dateD" type="date" value="${form.dateD}"/>
-        <input id="f_dateT" type="time" value="${form.dateT}" style="max-width:110px"/>
+        <div style="flex:1.3">${dtField('f_dateD','date',form.dateD)}</div>
+        <div style="flex:1">${dtField('f_dateT','time',form.dateT)}</div>
       </div></div>
       <div class="field"><label>${category==='exame'?'Observação (ex: resultado, ver planilha)':'Observação (opcional)'}</label><textarea id="f_note">${esc(form.note)}</textarea></div>`;
     return h;
@@ -845,8 +881,8 @@ function openEntryModal(category, editId){
     const cl = document.getElementById('f_clinica'); if(cl) cl.addEventListener('input', e=>{ form.clinica=e.target.value; syncSuggestions(); });
     const q = document.getElementById('f_quantidade'); if(q) q.addEventListener('input', e=> form.quantidade=e.target.value);
     const nt = document.getElementById('f_note'); if(nt) nt.addEventListener('input', e=> form.note=e.target.value);
-    const dd = document.getElementById('f_dateD'); if(dd) dd.addEventListener('input', e=> form.dateD=e.target.value);
-    const dt = document.getElementById('f_dateT'); if(dt) dt.addEventListener('input', e=> form.dateT=e.target.value);
+    wireDtField('f_dateD', v=> form.dateD=v);
+    wireDtField('f_dateT', v=> form.dateT=v);
 
     const foodPick = document.getElementById('foodPick');
     if(foodPick) foodPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.title=b.dataset.name; refreshBody(); }));
@@ -957,8 +993,8 @@ function openEntryModal(category, editId){
     const cl = document.getElementById('f_clinica'); if(cl) cl.addEventListener('input', e=>{ form.clinica=e.target.value; });
     const q = document.getElementById('f_quantidade'); if(q) q.addEventListener('input', e=> form.quantidade=e.target.value);
     const nt = document.getElementById('f_note'); if(nt) nt.addEventListener('input', e=> form.note=e.target.value);
-    const dd = document.getElementById('f_dateD'); if(dd) dd.addEventListener('input', e=> form.dateD=e.target.value);
-    const dt = document.getElementById('f_dateT'); if(dt) dt.addEventListener('input', e=> form.dateT=e.target.value);
+    wireDtField('f_dateD', v=> form.dateD=v);
+    wireDtField('f_dateT', v=> form.dateT=v);
     const foodPick = document.getElementById('foodPick'); if(foodPick) foodPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.title=b.dataset.name; refreshBody(); }));
     const openFM = document.getElementById('openFoodMgr'); if(openFM) openFM.addEventListener('click', ()=> openFoodManager(()=>{ refreshBody(); }));
     const medPick = document.getElementById('medPick'); if(medPick) medPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.title=b.dataset.name; if(!form.note && b.dataset.dose) form.note=b.dataset.dose; if(!editing && b.dataset.horario) form.dateT=b.dataset.horario; refreshBody(); }));
@@ -1125,7 +1161,7 @@ function openSettings(){
               <option value="Fêmea" ${draftSexo==='Fêmea'?'selected':''}>Fêmea</option>
             </select></div>
           </div>
-          <div class="field"><label>Data de nascimento (opcional, pra mostrar a idade)</label><input id="birthdateInput" type="date" value="${draftBirthdate}"/></div>
+          <div class="field"><label>Data de nascimento (opcional, pra mostrar a idade)</label>${dtField('birthdateInput','date',draftBirthdate)}</div>
           <div class="field"><label>Link da planilha de exames (Google Sheets)</label><input id="linkInput" value="${esc(draftSheetLink)}" placeholder="https://..."/></div>
           <div style="display:flex; justify-content:center; gap:16px; padding-top:10px; margin-top:6px; border-top:1px solid #F1EEE6">
             <button type="button" id="exportBtn" style="background:none; border:none; font-size:.7rem; color:var(--ink-muted); cursor:pointer">Exportar dados</button>
@@ -1138,7 +1174,7 @@ function openSettings(){
     </div>`;
     const racaEl = document.getElementById('racaInput'); racaEl.addEventListener('input', e=> draftRaca=e.target.value);
     const sexoEl = document.getElementById('sexoInput'); sexoEl.addEventListener('change', e=> draftSexo=e.target.value);
-    const bdEl = document.getElementById('birthdateInput'); bdEl.addEventListener('input', e=> draftBirthdate=e.target.value);
+    wireDtField('birthdateInput', v=> draftBirthdate=v);
     const linkEl = document.getElementById('linkInput'); linkEl.addEventListener('input', e=> draftSheetLink=e.target.value);
     document.getElementById('exportBtn').addEventListener('click', exportBackup);
     const importFileEl = document.getElementById('importFileInput');
@@ -1346,11 +1382,11 @@ function openMedManager(onDone, jumpToId){
         <button data-tipo="pontual" class="${draft.tipo==='pontual'?'sel':''}">Pontual (início e fim)</button>
       </div></div>
       ${draft.tipo==='pontual'? `
-        <div class="field"><label>Início</label><input id="d_inicio" type="date" autocomplete="off" value="${draft.dataInicio}"/></div>
-        <div class="field"><label>Fim</label><input id="d_fim" type="date" autocomplete="off" value="${draft.dataFim}"/></div>
+        <div class="field"><label>Início</label>${dtField('d_inicio','date',draft.dataInicio)}</div>
+        <div class="field"><label>Fim</label>${dtField('d_fim','date',draft.dataFim)}</div>
       ` : ''}
       <div class="field"><label>Dose / instruções (opcional)</label><input id="d_dose" autocomplete="off" value="${esc(draft.dose)}" placeholder="ex: 1 comprimido"/></div>
-      <div class="field"><label>Horário programado (opcional)</label><input id="d_horario" type="time" autocomplete="off" value="${draft.horario}"/>
+      <div class="field"><label>Horário programado (opcional)</label>${dtField('d_horario','time',draft.horario)}
       </div>
       <div style="display:flex; gap:8px; margin-top:4px">
         <button class="btn-secondary" id="cancelAdd" style="flex:1">Cancelar</button>
@@ -1359,10 +1395,10 @@ function openMedManager(onDone, jumpToId){
     </div>`;
     document.getElementById('d_name').addEventListener('input', e=>{ draft.name=e.target.value; document.getElementById('confirmAdd').disabled = !draft.name.trim(); });
     document.querySelectorAll('[data-tipo]').forEach(b=> b.addEventListener('click', ()=>{ draft.tipo=b.dataset.tipo; renderAddArea(); }));
-    const di = document.getElementById('d_inicio'); if(di) di.addEventListener('input', e=> draft.dataInicio=e.target.value);
-    const df = document.getElementById('d_fim'); if(df) df.addEventListener('input', e=> draft.dataFim=e.target.value);
+    wireDtField('d_inicio', v=> draft.dataInicio=v);
+    wireDtField('d_fim', v=> draft.dataFim=v);
     document.getElementById('d_dose').addEventListener('input', e=> draft.dose=e.target.value);
-    document.getElementById('d_horario').addEventListener('input', e=> draft.horario=e.target.value);
+    wireDtField('d_horario', v=> draft.horario=v);
     document.getElementById('cancelAdd').addEventListener('click', ()=>{ adding=false; editingId=null; syncMedListVisibility(); renderAddArea(); });
     document.getElementById('confirmAdd').addEventListener('click', ()=>{
       const n = draft.name.trim(); if(!n) return;
