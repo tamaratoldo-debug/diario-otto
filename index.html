@@ -151,11 +151,17 @@
   </div>
 
   <div style="margin-top:20px; padding:0 4px">
-    <div class="search-box">
+    <div class="search-box" id="searchBox" style="display:none; margin-bottom:10px">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
       <input id="searchInput" placeholder="Buscar registros..." />
+      <button id="searchCloseBtn" style="background:none; border:none; padding:2px; display:flex; flex-shrink:0">${'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ink-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'}</button>
     </div>
-    <div class="filters" id="filterChips"></div>
+    <div style="display:flex; align-items:center; gap:8px">
+      <button id="searchToggleBtn" style="flex-shrink:0; width:34px; height:34px; border-radius:50%; border:1px solid #E2E4EA; background:transparent; display:flex; align-items:center; justify-content:center">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ink-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+      <div class="filters" id="filterChips" style="margin-top:0"></div>
+    </div>
   </div>
 
   <div style="margin-top:16px; padding:0 4px" id="timeline"></div>
@@ -705,7 +711,7 @@ async function importBackup(file){
 // ================= ENTRY MODAL =================
 function emptyForm(cat){
   const now = new Date();
-  return { title:'', quantidade:'', dateD: todayStr(), dateT: `${pad(now.getHours())}:${pad(now.getMinutes())}`, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:EXAME_TIPOS[0], photo:'', photoBlob:null, photoId:'', removedPhoto:false, anexoUrl:'', anexoBlob:null, anexoId:'', anexoName:'', anexoType:'', removedAnexo:false };
+  return { title:'', quantidade:'', dateD: todayStr(), dateT: `${pad(now.getHours())}:${pad(now.getMinutes())}`, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:'', photo:'', photoBlob:null, photoId:'', removedPhoto:false, anexoUrl:'', anexoBlob:null, anexoId:'', anexoName:'', anexoType:'', removedAnexo:false };
 }
 
 function openEntryModal(category, editId){
@@ -715,7 +721,7 @@ function openEntryModal(category, editId){
     title: editing.title||'', quantidade: editing.quantidade||'',
     dateD: toLocalDateStr(new Date(editing.date)), dateT: fmtTime(editing.date),
     note: editing.note||'', value: editing.value ?? '', gravidade: editing.gravidade||'',
-    comoComeu: editing.comoComeu||'', clinica: editing.clinica||'', tipoExame: editing.tipoExame||EXAME_TIPOS[0],
+    comoComeu: editing.comoComeu||'', clinica: editing.clinica||'', tipoExame: editing.tipoExame||'',
     photo: editing.photo||'', photoBlob:null, photoId: editing.photoId||'', removedPhoto:false,
     anexoUrl:'', anexoBlob:null, anexoId: editing.anexoId||'', anexoName: editing.anexoName||'', anexoType: editing.anexoType||'', removedAnexo:false
   } : emptyForm();
@@ -784,11 +790,10 @@ function openEntryModal(category, editId){
     }
     if(category==='procedimento'){
       h += `<div class="field"><label>Procedimento</label><input id="f_title" value="${esc(form.title)}" placeholder="ex: Vacina V10, Cirurgia..."/>
-        <div class="pickgrid" id="procPick" style="margin-top:6px">${suggestChips('procedimento', form.title)}</div>
       </div>`;
     }
     if(category==='exame'){
-      h += `<div class="field"><label>Tipo de exame</label><div class="pickgrid" id="exPick">${EXAME_TIPOS.map(t=>`<button type="button" class="pick-btn ${form.tipoExame===t?'sel':''}" style="${form.tipoExame===t?`background:${cat.hex}`:''}" data-t="${t}">${t}</button>`).join('')}</div></div>
+      h += `<div class="field"><label>Tipo de exame</label><input id="f_tipoExame" value="${esc(form.tipoExame)}" placeholder="ex: Sangue, Imagem, Urina..."/></div>
       ${settings.sheetLink ? `<a href="${esc(settings.sheetLink)}" target="_blank" rel="noreferrer" class="link-btn" style="color:${cat.hex}; margin-bottom:14px; display:inline-flex; align-items:center; gap:5px">${icon('external',13,cat.hex)} Ver planilha de exames</a>` : ''}`;
     }
     if(quickPick){
@@ -868,8 +873,8 @@ function openEntryModal(category, editId){
     gravRow.forEach(b=> b.addEventListener('click', ()=>{ form.gravidade = form.gravidade===b.dataset.g ? '' : b.dataset.g; refreshBody(); }));
     wirePhoto();
 
-    const exPick = document.getElementById('exPick');
-    if(exPick) exPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.tipoExame=b.dataset.t; refreshBody(); }));
+    const tipoExameInput = document.getElementById('f_tipoExame');
+    if(tipoExameInput) tipoExameInput.addEventListener('input', e=> form.tipoExame=e.target.value);
 
     document.querySelectorAll('[data-sugg]').forEach(b=> b.addEventListener('click', ()=>{
       const kind=b.dataset.sugg, val=b.dataset.val;
@@ -961,7 +966,7 @@ function openEntryModal(category, editId){
     const comoList = document.getElementById('comoList'); if(comoList) comoList.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.comoComeu = form.comoComeu===b.dataset.v ? '' : b.dataset.v; refreshBody(); }));
     document.querySelectorAll('[data-g]').forEach(b=> b.addEventListener('click', ()=>{ form.gravidade = form.gravidade===b.dataset.g ? '' : b.dataset.g; refreshBody(); }));
     wirePhoto();
-    const exPick = document.getElementById('exPick'); if(exPick) exPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.tipoExame=b.dataset.t; refreshBody(); }));
+    const tipoExameInput2 = document.getElementById('f_tipoExame'); if(tipoExameInput2) tipoExameInput2.addEventListener('input', e=> form.tipoExame=e.target.value);
     document.querySelectorAll('[data-sugg]').forEach(b=> b.addEventListener('click', ()=>{ const kind=b.dataset.sugg, val=b.dataset.val; if(kind==='clinica') form.clinica=val; else if(kind==='quantidade') form.quantidade=val; else form.title=val; refreshBody(); }));
   }
 
@@ -1383,6 +1388,17 @@ function openMedManager(onDone, jumpToId){
 
 // ---------- top-level wiring ----------
 document.getElementById('searchInput').addEventListener('input', e=>{ search=e.target.value; renderTimeline(); });
+document.getElementById('searchToggleBtn').addEventListener('click', ()=>{
+  const box = document.getElementById('searchBox');
+  const opening = box.style.display==='none';
+  box.style.display = opening ? 'flex' : 'none';
+  if(opening){ document.getElementById('searchInput').focus(); }
+  else { search=''; document.getElementById('searchInput').value=''; renderTimeline(); }
+});
+document.getElementById('searchCloseBtn').addEventListener('click', ()=>{
+  document.getElementById('searchBox').style.display='none';
+  search=''; document.getElementById('searchInput').value=''; renderTimeline();
+});
 
 renderQuickActions();
 renderFilters();
