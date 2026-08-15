@@ -63,7 +63,7 @@
   .chip-filter{white-space:nowrap; font-size:.75rem; font-weight:500; padding:6px 12px; border-radius:999px; border:1px solid #EAE5DA; background:#fff; color:var(--ink-muted); flex-shrink:0; cursor:pointer}
   .chip-filter.active{border:none; color:#fff}
 
-  .month-label{font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--ink-muted); margin:16px 4px 8px}
+  .month-label{font-size:.9rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--ink); margin:22px 4px 10px}
   .day-squares-row{display:flex; gap:8px; overflow-x:auto; padding:2px 4px 10px; scrollbar-width:none}
   .day-squares-row::-webkit-scrollbar{display:none}
   .day-square{flex-shrink:0; width:46px; display:flex; flex-direction:column; align-items:center; gap:3px; background:#fff; border:1px solid #EFEBE1; border-radius:12px; padding:8px 4px 7px; font-family:inherit; cursor:pointer}
@@ -660,7 +660,7 @@ function renderTimeline(){
     </button>`;
     if(isCollapsed) continue;
 
-    let squaresHtml = '', expandedHtml = '';
+    let squaresHtml = '', cardsHtml = '';
     for(const day of month.days){
       const isToday = day.key===todayKey;
       const pendingHtml = isToday ? pendingRowsHtml(activeMedsToday) : '';
@@ -675,16 +675,17 @@ function renderTimeline(){
         <div class="ds-w">${weekday}</div>
       </button>`;
 
-      if(isExpanded){
-        expandedHtml += `<div class="day-card"><div class="day-num"><div class="n">${dayNum}</div><div class="m">${fmtMonthShort(refDate)}</div></div><div class="day-sep"></div><div class="entries-col">`;
-        expandedHtml += pendingHtml;
-        expandedHtml += day.items.map(entryRowHtml).join('');
-        expandedHtml += `</div></div>`;
-      }
+      // Cada dia sempre existe no DOM, só escondido/mostrado via display — nunca
+      // recriado. Isso evita reconstruir a timeline inteira a cada toque, o que
+      // era a causa do salto de rolagem.
+      cardsHtml += `<div class="day-card" data-daycard="${esc(day.key)}" style="${isExpanded?'':'display:none'}"><div class="day-num"><div class="n">${dayNum}</div></div><div class="day-sep"></div><div class="entries-col">`;
+      cardsHtml += pendingHtml;
+      cardsHtml += day.items.map(entryRowHtml).join('');
+      cardsHtml += `</div></div>`;
     }
     if(squaresHtml){
       html += `<div class="day-squares-row">${squaresHtml}</div>`;
-      html += expandedHtml;
+      html += cardsHtml;
     }
   }
   host.innerHTML = html;
@@ -692,14 +693,11 @@ function renderTimeline(){
   host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med)));
   host.querySelectorAll('[data-daysquare]').forEach(b=> b.addEventListener('click', ()=>{
     const key = b.dataset.daysquare;
-    const posBefore = b.getBoundingClientRect().top;
-    if(expandedDays.has(key)) expandedDays.delete(key); else expandedDays.add(key);
-    renderTimeline();
-    const newBtn = host.querySelector(`[data-daysquare="${CSS.escape(key)}"]`);
-    if(newBtn){
-      const posAfter = newBtn.getBoundingClientRect().top;
-      window.scrollBy(0, posAfter - posBefore);
-    }
+    const card = host.querySelector(`[data-daycard="${CSS.escape(key)}"]`);
+    const nowExpanded = !expandedDays.has(key);
+    if(nowExpanded) expandedDays.add(key); else expandedDays.delete(key);
+    b.classList.toggle('active', nowExpanded);
+    if(card) card.style.display = nowExpanded ? '' : 'none';
   }));
   const medsToggle = document.getElementById('medsSummaryToggle');
   if(medsToggle) medsToggle.addEventListener('click', ()=>{ medsExpanded = !medsExpanded; renderTimeline(); });
