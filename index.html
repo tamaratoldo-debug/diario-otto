@@ -46,7 +46,7 @@
   .link-btn{background:none; border:none; font-size:.75rem; font-weight:600; display:flex; align-items:center; gap:4px; cursor:pointer; padding:0}
   .section-title{font-size:.9rem; font-weight:600}
 
-  .pending-checkbox{width:18px; height:18px; border-radius:50%; border:2px solid #7FB89A; flex-shrink:0; display:inline-block}
+  .pending-checkbox{width:18px; height:18px; border-radius:50%; border:2px solid #7FB89A; flex-shrink:0; display:flex; align-items:center; justify-content:center}
   .photo-preview{position:relative; display:inline-block; margin-top:2px}
   .photo-preview img{width:100px; height:100px; object-fit:cover; border-radius:10px; display:block; border:1px solid #E5E0D4}
   .photo-remove{position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:999px; background:#A8473A; border:2px solid #fff; display:flex; align-items:center; justify-content:center; cursor:pointer}
@@ -416,16 +416,17 @@ function dosesGivenToday(medId){
 }
 
 function pendingMedsForToday(){
-  return meds.filter(isMedActiveToday).filter(m=> dosesGivenToday(m.id).length===0);
+  return meds.filter(isMedActiveToday);
 }
 
-function pendingRowsHtml(pending){
-  return pending.map(m=>{
+function pendingRowsHtml(activeMeds){
+  return activeMeds.map(m=>{
+    const given = dosesGivenToday(m.id).length > 0;
     const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}`;
     return `<button class="entry-row" data-med="${m.id}">
       <div class="entry-top">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
-        <span class="pending-checkbox" aria-label="Marcar como dado"></span>
+        <span class="pending-checkbox" style="${given?`background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}`:''}" aria-label="${given?'Dado hoje, toque pra desfazer':'Marcar como dado'}">${given?icon('check',11,'#fff'):''}</span>
       </div>
       <div class="entry-sub">${sub}</div>
     </button>`;
@@ -467,6 +468,7 @@ function entrySubtitle(e){
     return parts.join(' · ');
   }
   if(e.category==='consulta' && e.clinica) return e.clinica + (e.note? ' · '+e.note : '');
+  if(e.category==='peso') return `${e.value} kg` + (e.note? ' · '+e.note : '');
   return e.note || '';
 }
 
@@ -490,13 +492,27 @@ function renderTimeline(){
     curMonth.days[curMonth.days.length-1].items.push(e);
   }
 
-  // Only show the pending meds checklist when it's meaningful: no filter narrowing to something unrelated, no active search.
+  // Only show the today's meds checklist when it's meaningful: no filter narrowing to something unrelated, no active search.
   const showPending = (filter==='todos' || filter==='remedio') && !search.trim();
-  const pending = showPending ? pendingMedsForToday() : [];
+  const activeMedsToday = showPending ? pendingMedsForToday() : [];
+  const activeMedIdsToday = new Set(activeMedsToday.map(m=>m.id));
   const todayKey = new Date().toDateString();
   const todayMonthKey = fmtMonthYear(new Date().toISOString());
 
-  if(pending.length > 0){
+  if(showPending){
+    // Registry-linked remedio doses logged today are already represented (checked) in the
+    // stable checklist above — remove them here so they don't also show a second time below.
+    const todayDate = todayStr();
+    for(const month of months){
+      if(month.key!==todayMonthKey) continue;
+      for(const day of month.days){
+        if(day.key!==todayKey) continue;
+        day.items = day.items.filter(e=> !(e.category==='remedio' && e.medId && activeMedIdsToday.has(e.medId) && isSameDay(e.date, todayDate)));
+      }
+    }
+  }
+
+  if(activeMedsToday.length > 0){
     let curMonth = months.find(m=> m.key===todayMonthKey);
     if(!curMonth){ curMonth = {key:todayMonthKey, days:[]}; months.unshift(curMonth); }
     let todayDay = curMonth.days.find(d=> d.key===todayKey);
@@ -512,7 +528,7 @@ function renderTimeline(){
     html += `<div class="month-label">${month.key}</div>`;
     for(const day of month.days){
       const isToday = day.key===todayKey;
-      const pendingHtml = isToday ? pendingRowsHtml(pending) : '';
+      const pendingHtml = isToday ? pendingRowsHtml(activeMedsToday) : '';
       if(day.items.length===0 && !pendingHtml) continue;
       const dayNum = day.items[0] ? fmtDay(day.items[0].date) : new Date().getDate();
       const dayMon = day.items[0] ? fmtMonthShort(day.items[0].date) : fmtMonthShort(new Date().toISOString());
@@ -1154,8 +1170,8 @@ function openMedManager(onDone){
       if(editingId===b.dataset.id){ adding=false; editingId=null; }
       render();
     }));
-    document.querySelectorAll('#medList .manager-item').forEach(row=> row.addEventListener('click', ()=>{
-      const m = list.find(x=>x.id===row.dataset.open);
+    document.querySelectorAll('#medList .manager-item').forEach((row, idx)=> row.addEventListener('click', ()=>{
+      const m = list[idx];
       if(!m) return;
       editingId = m.id;
       adding = true;
@@ -1175,17 +1191,17 @@ function openMedManager(onDone){
     }
     area.innerHTML = `<div class="add-form">
       ${editingId? `<div class="hint" style="margin-bottom:8px; font-weight:600; color:${CATEGORIES.remedio.hex}">Editando</div>` : ''}
-      <div class="field"><label>Nome do remédio</label><input id="d_name" value="${esc(draft.name)}" placeholder="ex: Omeprazol"/></div>
+      <div class="field"><label>Nome do remédio</label><input id="d_name" autocomplete="off" value="${esc(draft.name)}" placeholder="ex: Omeprazol"/></div>
       <div class="field"><label>Tipo</label><div class="tipo-toggle">
         <button data-tipo="continuo" class="${draft.tipo==='continuo'?'sel':''}">Contínuo</button>
         <button data-tipo="pontual" class="${draft.tipo==='pontual'?'sel':''}">Pontual (início e fim)</button>
       </div></div>
       ${draft.tipo==='pontual'? `<div class="row2">
-        <div class="field"><label>Início</label><input id="d_inicio" type="date" value="${draft.dataInicio}"/></div>
-        <div class="field"><label>Fim</label><input id="d_fim" type="date" value="${draft.dataFim}"/></div>
+        <div class="field"><label>Início</label><input id="d_inicio" type="date" autocomplete="off" value="${draft.dataInicio}"/></div>
+        <div class="field"><label>Fim</label><input id="d_fim" type="date" autocomplete="off" value="${draft.dataFim}"/></div>
       </div>` : ''}
-      <div class="field"><label>Dose / instruções (opcional)</label><input id="d_dose" value="${esc(draft.dose)}" placeholder="ex: 1 comprimido"/></div>
-      <div class="field"><label>Horário programado (opcional)</label><input id="d_horario" type="time" value="${draft.horario}"/>
+      <div class="field"><label>Dose / instruções (opcional)</label><input id="d_dose" autocomplete="off" value="${esc(draft.dose)}" placeholder="ex: 1 comprimido"/></div>
+      <div class="field"><label>Horário programado (opcional)</label><input id="d_horario" type="time" autocomplete="off" value="${draft.horario}"/>
         <div class="hint">Ao tocar em "dado agora" no checklist, o registro usa esse horário — não o momento exato do toque.</div>
       </div>
       <div style="display:flex; gap:8px; margin-top:4px">
@@ -1218,7 +1234,7 @@ function openMedManager(onDone){
     });
   }
 
-  function finish(){ meds=list; persistMeds(); closeModal(); if(onDone) onDone(); }
+  function finish(){ meds=list; persistMeds(); closeModal(); renderTimeline(); if(onDone) onDone(); }
   render();
 }
 
