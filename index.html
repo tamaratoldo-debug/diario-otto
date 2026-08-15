@@ -872,6 +872,10 @@ function openSettings(){
   let draftPhotoUrl = profilePhotoUrl;
   let removedPhoto = false;
   let saving = false;
+  let draftRaca = settings.raca || '';
+  let draftSexo = settings.sexo || '';
+  let draftBirthdate = settings.birthdate || '';
+  let draftSheetLink = settings.sheetLink || '';
 
   function render(){
     host.innerHTML = `<div class="overlay" id="ovSet">
@@ -884,19 +888,23 @@ function openSettings(){
             <input type="file" id="profilePhotoInput" accept="image/*" style="display:none"/>
           </div>
           <div class="row2">
-            <div class="field"><label>Raça (opcional)</label><input id="racaInput" value="${esc(settings.raca||'')}" placeholder="ex: Vira-lata"/></div>
+            <div class="field"><label>Raça (opcional)</label><input id="racaInput" value="${esc(draftRaca)}" placeholder="ex: Vira-lata"/></div>
             <div class="field"><label>Sexo (opcional)</label><select id="sexoInput">
-              <option value="" ${!settings.sexo?'selected':''}></option>
-              <option value="Macho" ${settings.sexo==='Macho'?'selected':''}>Macho</option>
-              <option value="Fêmea" ${settings.sexo==='Fêmea'?'selected':''}>Fêmea</option>
+              <option value="" ${!draftSexo?'selected':''}></option>
+              <option value="Macho" ${draftSexo==='Macho'?'selected':''}>Macho</option>
+              <option value="Fêmea" ${draftSexo==='Fêmea'?'selected':''}>Fêmea</option>
             </select></div>
           </div>
-          <div class="field"><label>Data de nascimento (opcional, pra mostrar a idade)</label><input id="birthdateInput" type="date" value="${settings.birthdate||''}"/></div>
-          <div class="field"><label>Link da planilha de exames (Google Sheets)</label><input id="linkInput" value="${esc(settings.sheetLink)}" placeholder="https://..."/></div>
+          <div class="field"><label>Data de nascimento (opcional, pra mostrar a idade)</label><input id="birthdateInput" type="date" value="${draftBirthdate}"/></div>
+          <div class="field"><label>Link da planilha de exames (Google Sheets)</label><input id="linkInput" value="${esc(draftSheetLink)}" placeholder="https://..."/></div>
         </div>
         <div class="sheet-foot"><button class="btn-primary" id="saveSet" ${saving?'disabled':''}>${saving?'Salvando...':'Salvar'}</button></div>
       </div>
     </div>`;
+    const racaEl = document.getElementById('racaInput'); racaEl.addEventListener('input', e=> draftRaca=e.target.value);
+    const sexoEl = document.getElementById('sexoInput'); sexoEl.addEventListener('change', e=> draftSexo=e.target.value);
+    const bdEl = document.getElementById('birthdateInput'); bdEl.addEventListener('input', e=> draftBirthdate=e.target.value);
+    const linkEl = document.getElementById('linkInput'); linkEl.addEventListener('input', e=> draftSheetLink=e.target.value);
     document.getElementById('ovSet').addEventListener('click', e=>{ if(e.target.id==='ovSet' && !saving) closeModal(); });
     document.getElementById('closeSet').addEventListener('click', ()=>{ if(!saving) closeModal(); });
 
@@ -923,10 +931,10 @@ function openSettings(){
 
     document.getElementById('saveSet').addEventListener('click', async ()=>{
       saving = true; render();
-      settings.sheetLink = document.getElementById('linkInput').value.trim();
-      settings.birthdate = document.getElementById('birthdateInput').value;
-      settings.raca = document.getElementById('racaInput').value.trim();
-      settings.sexo = document.getElementById('sexoInput').value;
+      settings.sheetLink = draftSheetLink.trim();
+      settings.birthdate = draftBirthdate;
+      settings.raca = draftRaca.trim();
+      settings.sexo = draftSexo;
       if(draftPhotoBlob){
         const newId = genId();
         try{
