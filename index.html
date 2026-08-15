@@ -478,11 +478,14 @@ function toggleMedToday(medId){
 // ---------- render: filters ----------
 function renderFilters(){
   const host = document.getElementById('filterChips');
-  const all = [['todos','Todos','var(--ink)']].concat(CATEGORY_ORDER.map(k=>[k, CATEGORIES[k].label, CATEGORIES[k].color]));
+  const all = CATEGORY_ORDER.map(k=>[k, CATEGORIES[k].label, CATEGORIES[k].color]);
   host.innerHTML = all.map(([key,label,color])=>
     `<button class="chip-filter ${filter===key?'active':''}" style="${filter===key?`background:${color}`:''}" data-f="${key}">${label}</button>`
   ).join('');
-  host.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ filter=b.dataset.f; renderTimeline(); renderFilters(); }));
+  host.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
+    filter = (filter===b.dataset.f) ? 'todos' : b.dataset.f;
+    renderTimeline(); renderFilters();
+  }));
 }
 
 // ---------- render: timeline ----------
@@ -762,10 +765,8 @@ function openEntryModal(category, editId){
     }
     if(category==='consulta'){
       h += `<div class="field"><label>Motivo</label><input id="f_title" value="${esc(form.title)}" placeholder="ex: Consulta de rotina, retorno..."/>
-        <div class="pickgrid" id="consPick" style="margin-top:6px">${suggestChips('consulta', form.title)}</div>
       </div>
       <div class="field"><label>Clínica / veterinário (opcional)</label><input id="f_clinica" value="${esc(form.clinica)}" placeholder="ex: Dra. Ana, Clínica Pet+"/>
-        <div class="pickgrid" id="cliPick" style="margin-top:6px">${suggestChips('clinica', form.clinica)}</div>
       </div>
       <div class="field"><label>Anexo (opcional — foto ou PDF)</label>
         ${form.anexoUrl
