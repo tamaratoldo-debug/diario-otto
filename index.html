@@ -505,36 +505,47 @@ function pendingMedsForToday(){
   return meds.filter(isMedActiveToday);
 }
 
-function pendingRowsHtml(activeMeds){
-  if(activeMeds.length===0) return '';
-  const sorted = activeMeds.slice().sort((a,b)=> (a.horario||'99:99').localeCompare(b.horario||'99:99'));
-  const givenCount = sorted.filter(m=> dosesGivenToday(m).length>0).length;
+function pendingRowsHtml(activeMeds, adHocEntries){
+  adHocEntries = adHocEntries || [];
+  if(activeMeds.length===0 && adHocEntries.length===0) return '';
+  const sortedMeds = activeMeds.slice().sort((a,b)=> (a.horario||'99:99').localeCompare(b.horario||'99:99'));
+  const givenCount = sortedMeds.filter(m=> dosesGivenToday(m).length>0).length + adHocEntries.length;
+  const totalCount = sortedMeds.length + adHocEntries.length;
 
   const header = `<button class="entry-row" id="medsSummaryToggle" style="${medsExpanded?'border-bottom:none; padding-bottom:6px':''}">
     <div class="entry-top">
       <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>Remédios de hoje</span></div>
-      <span style="display:flex; align-items:center; gap:4px; color:var(--ink-muted); font-size:.72rem; font-weight:600">${givenCount}/${sorted.length}${icon(medsExpanded?'chevronUp':'chevronDown',14,'var(--ink-muted)')}</span>
+      <span style="display:flex; align-items:center; gap:4px; color:var(--ink-muted); font-size:.72rem; font-weight:600">${givenCount}/${totalCount}${icon(medsExpanded?'chevronUp':'chevronDown',14,'var(--ink-muted)')}</span>
     </div>
   </button>`;
 
   if(!medsExpanded) return header;
 
-  const rows = sorted.map((m, idx)=>{
+  const medRows = sortedMeds.map(m=>{
     const given = dosesGivenToday(m).length > 0;
-    const isLast = idx===sorted.length-1;
     const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}`;
-    return `<div class="entry-row" style="display:flex; align-items:flex-start; gap:8px; cursor:default; ${isLast?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)'}">
-      <button data-med-edit="${m.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
+    return `<button data-med-edit="${m.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
         <div class="entry-sub">${sub}</div>
       </button>
       <button data-med="${m.id}" aria-label="${given?'Dado hoje, toque pra desfazer':'Marcar como dado'}" style="background:none; border:none; padding:6px; margin:-6px -6px -6px 0; cursor:pointer; flex-shrink:0">
         <span class="pending-checkbox" style="${given?`background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}`:''}">${given?icon('check',11,'#fff'):''}</span>
-      </button>
-    </div>`;
-  }).join('');
+      </button>`;
+  });
 
-  return `<div style="background:${CATEGORIES.remedio.hex}0F; border-radius:12px; padding:2px 10px; margin:2px 0 8px">${header}${rows}</div>`;
+  const adHocRows = adHocEntries.slice().sort((a,b)=> new Date(a.date)-new Date(b.date)).map(e=>{
+    const sub = [fmtTime(e.date), e.note].filter(Boolean).join(' · ');
+    return `<button data-id="${e.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
+        <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(e.title)}</span></div>
+        <div class="entry-sub">${sub}</div>
+      </button>
+      <span class="pending-checkbox" style="background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}; margin:6px 0 6px 6px; flex-shrink:0">${icon('check',11,'#fff')}</span>`;
+  });
+
+  const allRows = [...medRows, ...adHocRows];
+  const rows = allRows.map((inner, idx)=> `<div class="entry-row" style="display:flex; align-items:flex-start; gap:8px; cursor:default; ${idx===allRows.length-1?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)'}">${inner}</div>`).join('');
+
+  return `${header}${rows}`;
 }
 
 function toggleMedToday(medId){
@@ -625,10 +636,12 @@ function renderTimeline(){
   const todayKey = new Date().toDateString();
   const todayMonthKey = fmtMonthYear(new Date().toISOString());
 
+  let adHocMedEntriesToday = [];
   if(showPending){
     // Registry-linked remedio doses logged today are already represented (checked) in the
     // stable checklist above — remove them here so they don't also show a second time below.
-    // Also catches older entries logged before medId tracking existed, matched by name.
+    // Doses avulsas (medId null, tipo "Dose única") também são puxadas pro checklist em vez
+    // de aparecerem soltas na lista principal do dia.
     const todayDate = todayStr();
     for(const month of months){
       if(month.key!==todayMonthKey) continue;
@@ -637,13 +650,15 @@ function renderTimeline(){
         day.items = day.items.filter(e=> {
           if(e.category!=='remedio' || !isSameDay(e.date, todayDate)) return true;
           const matches = e.medId ? activeMedIdsToday.has(e.medId) : (e.title && activeMedNamesToday.has(e.title.toLowerCase()));
-          return !matches;
+          if(matches) return false;
+          adHocMedEntriesToday.push(e);
+          return false;
         });
       }
     }
   }
 
-  if(activeMedsToday.length > 0){
+  if(activeMedsToday.length > 0 || adHocMedEntriesToday.length > 0){
     let curMonth = months.find(m=> m.key===todayMonthKey);
     if(!curMonth){ curMonth = {key:todayMonthKey, days:[]}; months.unshift(curMonth); }
     let todayDay = curMonth.days.find(d=> d.key===todayKey);
@@ -665,7 +680,7 @@ function renderTimeline(){
     let squaresHtml = '', cardsHtml = '';
     for(const day of month.days){
       const isToday = day.key===todayKey;
-      const pendingHtml = isToday ? pendingRowsHtml(activeMedsToday) : '';
+      const pendingHtml = isToday ? pendingRowsHtml(activeMedsToday, adHocMedEntriesToday) : '';
       if(day.items.length===0 && !pendingHtml) continue;
       const refDate = day.items[0] ? day.items[0].date : new Date().toISOString();
       const dayNum = fmtDay(refDate);
@@ -1559,7 +1574,6 @@ function openMedManager(onDone, jumpToId){
         persistEntries();
         closeModal();
         renderAll();
-        showSuccess('Dose registrada.');
         return;
       }
 
