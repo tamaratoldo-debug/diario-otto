@@ -695,9 +695,20 @@ function renderTimeline(){
     const key = b.dataset.daysquare;
     const card = host.querySelector(`[data-daycard="${CSS.escape(key)}"]`);
     const nowExpanded = !expandedDays.has(key);
+    // Se o quadrado tocado já está acima da parte visível da tela, abrir/fechar
+    // o card dele muda a altura da página inteira acima de onde você está
+    // olhando, e isso precisa de compensação manual — o navegador não faz
+    // isso sozinho aqui. Medimos a altura exata antes/depois e ajustamos a
+    // rolagem nessa quantidade exata, só quando necessário.
+    const aboveViewport = b.getBoundingClientRect().bottom < 0;
+    const prevHeight = document.documentElement.scrollHeight;
     if(nowExpanded) expandedDays.add(key); else expandedDays.delete(key);
     b.classList.toggle('active', nowExpanded);
     if(card) card.style.display = nowExpanded ? '' : 'none';
+    if(aboveViewport){
+      const newHeight = document.documentElement.scrollHeight;
+      window.scrollBy(0, newHeight - prevHeight);
+    }
   }));
   const medsToggle = document.getElementById('medsSummaryToggle');
   if(medsToggle) medsToggle.addEventListener('click', ()=>{ medsExpanded = !medsExpanded; renderTimeline(); });
