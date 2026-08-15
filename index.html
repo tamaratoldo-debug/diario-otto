@@ -1446,6 +1446,7 @@ function openMedManager(onDone, jumpToId){
   let adding = false;
   let editingId = null;
   let draft = {name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horario:''};
+  let submitting = false;
 
   if(jumpToId){
     const m = list.find(x=>x.id===jumpToId);
@@ -1457,6 +1458,7 @@ function openMedManager(onDone, jumpToId){
   }
 
   function render(){
+    submitting = false;
     host.innerHTML = `<div class="overlay" id="ovMed">
       <div class="sheet" style="max-height:90vh">
         <div class="sheet-head"><div class="sheet-title">Remédios atuais</div><button class="icon-btn" id="closeMed">${icon('x',18)}</button></div>
@@ -1545,9 +1547,11 @@ function openMedManager(onDone, jumpToId){
     wireDtField('d_horario', v=> draft.horario=v);
     document.getElementById('cancelAdd').addEventListener('click', ()=>{ adding=false; editingId=null; syncMedListVisibility(); renderAddArea(); });
     document.getElementById('confirmAdd').addEventListener('click', ()=>{
+      if(submitting) return;
       const n = draft.name.trim(); if(!n) return;
 
       if(draft.tipo==='unica'){
+        submitting = true;
         let date = new Date();
         if(draft.horario){ const [h,m2] = draft.horario.split(':').map(Number); date.setHours(h,m2,0,0); }
         entries.push({ id:genId(), category:'remedio', medId:null, title:n, note:draft.dose.trim(), date:date.toISOString(), createdAt:Date.now() });
@@ -1564,6 +1568,7 @@ function openMedManager(onDone, jumpToId){
         showWarning(`Já existe "${n}" cadastrado nesse mesmo horário. Edite o existente ou use um horário diferente.`);
         return;
       }
+      submitting = true;
       const payload = { name:n, tipo:draft.tipo, dataInicio: draft.tipo==='pontual'?draft.dataInicio:'', dataFim: draft.tipo==='pontual'?draft.dataFim:'', dose:draft.dose.trim(), horario:draft.horario };
       if(editingId){
         list = list.map(m=> m.id===editingId ? { ...m, ...payload } : m);
