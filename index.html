@@ -738,13 +738,10 @@ function openEntryModal(category, editId){
       h += `<div class="field"><label>Remédio</label>
         <div class="pickgrid" id="medPick">${meds.map(m=>{
           const sub = `${m.horario?m.horario:''}${m.horario&&m.dose?' · ':''}${m.dose?esc(m.dose):''}`;
-          const tag = quickPick ? 'div' : 'button';
-          const typeAttr = quickPick ? '' : 'type="button"';
-          const cursorStyle = quickPick ? 'cursor:default;' : '';
-          return `<${tag} ${typeAttr} class="med-pick-btn ${form.title===m.name?'sel':''}" style="${cursorStyle}${form.title===m.name?`background:${cat.hex}`:''}" data-name="${esc(m.name)}" data-dose="${esc(m.dose||'')}" data-horario="${esc(m.horario||'')}">
+          return `<button type="button" class="med-pick-btn ${form.title===m.name?'sel':''}" style="${form.title===m.name?`background:${cat.hex}`:''}" data-id="${m.id}" data-name="${esc(m.name)}" data-dose="${esc(m.dose||'')}" data-horario="${esc(m.horario||'')}">
             <div class="mp-name">${esc(m.name)}</div>
             ${sub?`<div class="mp-sub">${sub}</div>`:''}
-          </${tag}>`;
+          </button>`;
         }).join('') || '<span class="hint">Nenhum remédio cadastrado ainda.</span>'}</div>
         <button type="button" class="link-btn" id="openMedMgr" style="color:${cat.hex}; margin-top:8px">+ Gerenciar remédios</button>
       </div>`;
@@ -850,6 +847,11 @@ function openEntryModal(category, editId){
       if(!form.note && b.dataset.dose) form.note=b.dataset.dose;
       if(!editing && b.dataset.horario) form.dateT=b.dataset.horario;
       refreshBody();
+    }));
+    if(medPick && quickPick) medPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
+      const id = b.dataset.id;
+      closeModal();
+      openMedManager(null, id);
     }));
     const openMM = document.getElementById('openMedMgr'); if(openMM) openMM.addEventListener('click', ()=> openMedManager(()=>{ refreshBody(); }));
 
@@ -1261,12 +1263,21 @@ function openFoodManager(onDone){
 }
 
 // ================= MED MANAGER =================
-function openMedManager(onDone){
+function openMedManager(onDone, jumpToId){
   const host = document.getElementById('modalHost');
   let list = meds.slice();
   let adding = false;
   let editingId = null;
   let draft = {name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horario:''};
+
+  if(jumpToId){
+    const m = list.find(x=>x.id===jumpToId);
+    if(m){
+      editingId = m.id;
+      adding = true;
+      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horario:m.horario||'' };
+    }
+  }
 
   function render(){
     host.innerHTML = `<div class="overlay" id="ovMed">
