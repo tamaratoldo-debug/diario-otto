@@ -95,6 +95,7 @@
   .sheet-head{display:flex; align-items:center; justify-content:space-between; padding:16px 20px 12px; border-bottom:1px solid #F1EEE6; flex-shrink:0}
   .sheet-title{display:flex; align-items:center; gap:8px; font-weight:600; font-size:1rem; min-width:0}
   .icon-btn{width:40px; height:40px; border-radius:999px; border:none; background:#F1EEE6; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0}
+  .icon-btn:disabled{opacity:.35; cursor:default}
   .icon-btn.danger{background:#F6E9E6}
   .sheet-body{overflow-y:auto; padding:16px 20px 4px; flex:1; min-height:0}
   .sheet-foot{display:flex; gap:8px; padding:12px 20px 20px; border-top:1px solid #F1EEE6; flex-shrink:0}
@@ -332,6 +333,10 @@ let chips = {
   procedimento: store.get('otto:procedimento-chips', [])
 };
 let settings = store.get('otto:settings', {sheetLink:''});
+if(!settings.sheetLink){
+  settings.sheetLink = 'https://docs.google.com/spreadsheets/d/1E4vpByVHKkbf4Kbt3CbMF_kWNu90YMUdqsUzZWYU44Q/edit?usp=sharing';
+  store.set('otto:settings', settings);
+}
 let filter = 'todos';
 let search = '';
 
@@ -766,6 +771,8 @@ function openEntryModal(category, editId){
       </div></div>`;
       document.getElementById('btnKeepEditing').addEventListener('click', render);
       document.getElementById('btnDiscard').addEventListener('click', closeModal);
+      const headerClose = document.getElementById('btnCloseEntry');
+      if(headerClose) headerClose.disabled = true;
     } else closeModal();
   }
 
