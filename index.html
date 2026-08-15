@@ -162,14 +162,6 @@
     <div class="chart-wrap"><svg id="chartSvg" width="100%" height="130" viewBox="0 0 400 130" preserveAspectRatio="none"></svg></div>
   </div>
 
-  <a class="card section" id="sheetLinkCard" style="display:none; text-decoration:none; color:inherit; align-items:center; justify-content:space-between; flex-direction:row; padding:16px" target="_blank" rel="noreferrer">
-    <div style="display:flex; align-items:center; gap:8px">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--c-exame)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v6a2 2 0 0 0 .245.96l5.51 10.08A2 2 0 0 1 14 22H6.5a2 2 0 0 1-1.755-2.96l5.51-10.08A2 2 0 0 0 10.5 8V2"/><path d="M6.453 15h11.094"/><path d="M8.5 2h7"/></svg>
-      <span style="font-size:.9rem; font-weight:500">Planilha de exames</span>
-    </div>
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--ink-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg>
-  </a>
-
   <div style="margin-top:20px; padding:0 4px">
     <div class="search-box">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -203,8 +195,7 @@ const CATEGORIES = {
 };
 const CATEGORY_ORDER = ['alimentacao','remedio','peso','intercorrencia','consulta','procedimento','exame'];
 const COMO_COMEU = [
-  ['tudo_vontade','Comeu tudo com vontade'],
-  ['tudo_insistencia','Comeu tudo, com insistência'],
+  ['tudo_vontade','Comeu tudo'],
   ['parte','Comeu só parte'],
   ['cheirou_recusou','Cheirou e recusou'],
   ['recusou','Recusou totalmente']
@@ -226,7 +217,8 @@ const ICONS = {
   trash:'<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
   paw:'<path d="M11 5.172C11 3.782 9.423 2.679 7.5 3c-2.823.47-4.113 6.006-4 7 .08.703 1.725 1.722 3.656 1a2.5 2.5 0 1 1 3.626-3.256"/><circle cx="18" cy="7" r="1"/><circle cx="20.5" cy="10.5" r="1"/><circle cx="12" cy="21" r="1"/><path d="M9 8c0 2 1 3 2.5 3.5S13 15 13 17c0 2-1 3-2.5 3.5"/>',
-  camera:'<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="3.5"/>'
+  camera:'<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="3.5"/>',
+  external:'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/>'
 };
 function icon(name, size=16, stroke='currentColor'){
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[name]}</svg>`;
@@ -384,8 +376,6 @@ function renderHero(){
     document.getElementById('chartSvg').innerHTML = `<path d="${path}" fill="none" stroke="#3E6B5C" stroke-width="2"/>${dots}`;
   } else chartSection.style.display='none';
 
-  const sheetCard = document.getElementById('sheetLinkCard');
-  if(settings.sheetLink){ sheetCard.style.display='flex'; sheetCard.href = settings.sheetLink; } else sheetCard.style.display='none';
 }
 
 // ---------- render: quick actions ----------
@@ -571,6 +561,7 @@ function openEntryModal(category, editId){
 
   const cat = CATEGORIES[category];
   const host = document.getElementById('modalHost');
+  const quickPick = category==='remedio' && !editing;
 
   function canSave(){
     if(category==='peso') return form.value!=='' && !isNaN(parseFloat(form.value));
@@ -598,7 +589,6 @@ function openEntryModal(category, editId){
           </button>`;
         }).join('') || '<span class="hint">Nenhum remédio cadastrado ainda.</span>'}</div>
         <button type="button" class="link-btn" id="openMedMgr" style="color:${cat.hex}; margin-top:8px">+ Gerenciar remédios</button>
-        <div class="hint">Dica: pra remédios de hoje, use o checklist na tela principal — é mais rápido que abrir esse formulário.</div>
       </div>`;
     }
     if(category==='peso'){
@@ -629,7 +619,12 @@ function openEntryModal(category, editId){
       </div>`;
     }
     if(category==='exame'){
-      h += `<div class="field"><label>Tipo de exame</label><div class="pickgrid" id="exPick">${EXAME_TIPOS.map(t=>`<button type="button" class="pick-btn ${form.tipoExame===t?'sel':''}" style="${form.tipoExame===t?`background:${cat.hex}`:''}" data-t="${t}">${t}</button>`).join('')}</div></div>`;
+      h += `<div class="field"><label>Tipo de exame</label><div class="pickgrid" id="exPick">${EXAME_TIPOS.map(t=>`<button type="button" class="pick-btn ${form.tipoExame===t?'sel':''}" style="${form.tipoExame===t?`background:${cat.hex}`:''}" data-t="${t}">${t}</button>`).join('')}</div></div>
+      ${settings.sheetLink ? `<a href="${esc(settings.sheetLink)}" target="_blank" rel="noreferrer" class="link-btn" style="color:${cat.hex}; margin-bottom:14px; display:inline-flex; align-items:center; gap:5px">${icon('external',13,cat.hex)} Ver planilha de exames</a>` : ''}`;
+    }
+    if(quickPick){
+      h += `<div class="hint">Toque num remédio acima pra registrar agora, com o horário programado. Pra lançar uma dose de outro dia, registre e depois edite o horário direto no registro.</div>`;
+      return h;
     }
     h += `<div class="field"><label>Data e hora</label><div class="row2">
         <input id="f_dateD" type="date" value="${form.dateD}"/>
@@ -656,10 +651,10 @@ function openEntryModal(category, editId){
           </div>
         </div>
         <div class="sheet-body" id="bodyEntry">${fieldsHtml()}</div>
-        <div class="sheet-foot" id="footEntry">
+        ${quickPick ? '' : `<div class="sheet-foot" id="footEntry">
           <button class="btn-secondary" id="btnCancelEntry">Cancelar</button>
           <button class="btn-primary" id="btnSaveEntry" ${canSave()?'':'disabled'}>${editing?'Salvar alterações':'Registrar'}</button>
-        </div>
+        </div>`}
       </div>
     </div>`;
     wire();
@@ -668,9 +663,9 @@ function openEntryModal(category, editId){
   function wire(){
     document.getElementById('ovEntry').addEventListener('click', (ev)=>{ if(ev.target.id==='ovEntry') requestClose(); });
     document.getElementById('btnCloseEntry').addEventListener('click', requestClose);
-    document.getElementById('btnCancelEntry').addEventListener('click', requestClose);
-    if(editing) document.getElementById('btnDelEntry').addEventListener('click', ()=>{ closeModal(); openConfirmDelete(editing.id); });
-    document.getElementById('btnSaveEntry').addEventListener('click', save);
+    const cancelBtn = document.getElementById('btnCancelEntry'); if(cancelBtn) cancelBtn.addEventListener('click', requestClose);
+    if(editing){ const delBtn = document.getElementById('btnDelEntry'); if(delBtn) delBtn.addEventListener('click', ()=>{ closeModal(); openConfirmDelete(editing.id); }); }
+    const saveBtn = document.getElementById('btnSaveEntry'); if(saveBtn) saveBtn.addEventListener('click', save);
 
     const t = document.getElementById('f_title'); if(t) t.addEventListener('input', e=>{ form.title=e.target.value; toggleSave(); });
     const v = document.getElementById('f_value'); if(v) v.addEventListener('input', e=>{ form.value=e.target.value; toggleSave(); });
@@ -689,7 +684,8 @@ function openEntryModal(category, editId){
       form.title=b.dataset.name;
       if(!form.note && b.dataset.dose) form.note=b.dataset.dose;
       if(!editing && b.dataset.horario) form.dateT=b.dataset.horario;
-      refreshBody();
+      if(quickPick) save();
+      else refreshBody();
     }));
     const openMM = document.getElementById('openMedMgr'); if(openMM) openMM.addEventListener('click', ()=> openMedManager(()=>{ refreshBody(); }));
 
@@ -714,7 +710,7 @@ function openEntryModal(category, editId){
     // live re-render just the suggestion rows without losing focus on text inputs: simplest reliable approach is full refresh of body except focused field's caret;
     // acceptable tradeoff here given text fields are short.
   }
-  function toggleSave(){ document.getElementById('btnSaveEntry').disabled = !canSave(); }
+  function toggleSave(){ const b=document.getElementById('btnSaveEntry'); if(b) b.disabled = !canSave(); }
 
   function wirePhoto(){
     const addBtn = document.getElementById('addPhotoBtn');
@@ -886,17 +882,27 @@ function openSettings(){
 function openFoodManager(onDone){
   const host = document.getElementById('modalHost');
   let list = foods.slice();
+  let expanded = null;
   function render(){
     host.innerHTML = `<div class="overlay" id="ovFood">
-      <div class="sheet">
+      <div class="sheet" style="max-height:90%">
         <div class="sheet-head"><div class="sheet-title">Meus alimentos</div><button class="icon-btn" id="closeFood">${icon('x',18)}</button></div>
         <div class="sheet-body">
-          <div class="hint" style="margin-bottom:12px">Cadastre aqui tudo que o Otto costuma comer. Depois é só tocar, sem digitar de novo.</div>
-          <div style="display:flex; gap:8px; margin-bottom:14px">
-            <input id="newFoodName" placeholder="ex: Ração seca, Frango com arroz..." style="flex:1; padding:10px 12px; border-radius:10px; border:1px solid #E5E0D4; font-size:16px; background:#FBFAF7; font-family:inherit"/>
-            <button id="addFoodBtn" style="flex-shrink:0; border:none; border-radius:12px; padding:0 16px; background:${CATEGORIES.alimentacao.hex}; color:#fff">${icon('plus',18,'#fff')}</button>
-          </div>
-          <div id="foodList">${list.map(f=>`<div class="manager-item"><span class="name">${esc(f.name)}</span><button class="del-btn" data-id="${f.id}">${icon('trash',14,'var(--ink-muted)')}</button></div>`).join('') || '<div class="hint" style="text-align:center; padding:16px 0">Nada cadastrado ainda.</div>'}</div>
+          <div class="hint" style="margin-bottom:12px">Cadastre aqui tudo que o Otto costuma comer. Depois é só tocar, sem digitar de novo. Se for uma receita da nutri, pode colar ela inteira no campo de baixo.</div>
+          <div class="field"><label>Nome curto</label><input id="newFoodName" placeholder="ex: Ração seca, Frango com arroz..." style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid #E5E0D4; font-size:16px; background:#FBFAF7; font-family:inherit; box-sizing:border-box"/></div>
+          <div class="field"><label>Receita completa (opcional)</label><textarea id="newFoodRecipe" placeholder="ex: 100g frango cozido + 50g abóbora + 1 colher de óleo de linhaça..." style="min-height:80px"></textarea></div>
+          <button id="addFoodBtn" style="width:100%; border:none; border-radius:12px; padding:12px; background:${CATEGORIES.alimentacao.hex}; color:#fff; font-weight:600; font-size:.85rem; margin-bottom:14px">Adicionar alimento</button>
+          <div id="foodList">${list.map(f=>`
+            <div class="manager-item" style="flex-direction:column; align-items:stretch">
+              <div style="display:flex; align-items:center; justify-content:space-between">
+                <span class="name">${esc(f.name)}</span>
+                <div style="display:flex; align-items:center; gap:10px">
+                  ${f.receita ? `<button class="link-btn" data-expand="${f.id}" style="color:${CATEGORIES.alimentacao.hex}">${expanded===f.id?'Ocultar':'Ver receita'}</button>` : ''}
+                  <button class="del-btn" data-id="${f.id}">${icon('trash',14,'var(--ink-muted)')}</button>
+                </div>
+              </div>
+              ${f.receita && expanded===f.id ? `<div class="hint" style="margin-top:6px; white-space:pre-wrap">${esc(f.receita)}</div>` : ''}
+            </div>`).join('') || '<div class="hint" style="text-align:center; padding:16px 0">Nada cadastrado ainda.</div>'}</div>
         </div>
         <div class="sheet-foot"><button class="btn-primary" id="doneFoodBtn">Pronto</button></div>
       </div>
@@ -905,15 +911,16 @@ function openFoodManager(onDone){
     document.getElementById('closeFood').addEventListener('click', finish);
     document.getElementById('doneFoodBtn').addEventListener('click', finish);
     document.getElementById('addFoodBtn').addEventListener('click', addFood);
-    document.getElementById('newFoodName').addEventListener('keydown', e=>{ if(e.key==='Enter') addFood(); });
     document.querySelectorAll('#foodList .del-btn').forEach(b=> b.addEventListener('click', ()=>{ list = list.filter(f=>f.id!==b.dataset.id); render(); }));
+    document.querySelectorAll('#foodList [data-expand]').forEach(b=> b.addEventListener('click', ()=>{ expanded = expanded===b.dataset.expand ? null : b.dataset.expand; render(); }));
   }
   function addFood(){
-    const input = document.getElementById('newFoodName');
-    const n = input.value.trim();
+    const nameInput = document.getElementById('newFoodName');
+    const recipeInput = document.getElementById('newFoodRecipe');
+    const n = nameInput.value.trim();
     if(!n) return;
-    if(list.some(f=>f.name.toLowerCase()===n.toLowerCase())){ input.value=''; return; }
-    list.push({id:genId(), name:n});
+    if(list.some(f=>f.name.toLowerCase()===n.toLowerCase())){ nameInput.value=''; return; }
+    list.push({id:genId(), name:n, receita: recipeInput.value.trim()});
     render();
   }
   function finish(){
