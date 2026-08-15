@@ -361,7 +361,8 @@ let chips = {
   procedimento: store.get('otto:procedimento-chips', []),
   quantidade: store.get('otto:quantidade-chips', [])
 };
-let settings = store.get('otto:settings', {sheetLink:''});
+let settings = store.get('otto:settings', {sheetLink:'', crecheLink:''});
+if(!settings.crecheLink){ settings.crecheLink = 'https://claude.ai/public/artifacts/206f7428-4058-44e8-b558-5db49e3a9673'; writeStore('otto:settings', settings); }
 if(!settings.sheetLink){
   settings.sheetLink = 'https://docs.google.com/spreadsheets/d/1E4vpByVHKkbf4Kbt3CbMF_kWNu90YMUdqsUzZWYU44Q/edit?usp=sharing';
   store.set('otto:settings', settings);
