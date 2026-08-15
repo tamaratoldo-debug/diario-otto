@@ -137,6 +137,7 @@
 <body>
 
 <div id="warningHost"></div>
+<div id="backupBannerHost"></div>
 
 <div class="wrap">
 
@@ -720,6 +721,9 @@ async function exportBackup(silent){
     a.click();
     document.body.removeChild(a);
     setTimeout(()=> URL.revokeObjectURL(url), 2000);
+    settings.lastAutoBackupAt = new Date().toISOString();
+    persistSettings();
+    hideBackupBanner();
     if(!silent) showSuccess('Backup exportado.');
     return true;
   }catch(err){
@@ -729,17 +733,30 @@ async function exportBackup(silent){
   }
 }
 
-// Backup automático e silencioso: roda sozinho quando o app é aberto, sem
-// precisar que a pessoa lembre de clicar em nada. Como não existe processo
-// rodando em segundo plano num site estático, isso só dispara nos momentos
-// em que o app é de fato aberto — não é literalmente 2x ao dia no relógio,
-// é "na primeira vez que abrir depois de 12h desde o último backup".
+// Backup: em vez de baixar sozinho (o que forçaria a caixa "Deseja baixar?"
+// do Safari aparecer sem o usuário pedir), mostramos um aviso discreto
+// quando já faz 12h+ desde o último backup, com um botão. O download só
+// dispara quando a pessoa toca — mas essa caixa do Safari ainda aparece
+// nesse momento, isso é do sistema e não dá pra evitar.
 const AUTO_BACKUP_INTERVAL_MS = 12*60*60*1000; // 12h
-async function autoBackupIfNeeded(){
+let backupBannerDismissedAt = 0;
+function hideBackupBanner(){
+  const el = document.getElementById('backupBannerHost');
+  if(el) el.innerHTML = '';
+}
+function checkBackupBanner(){
   const last = settings.lastAutoBackupAt ? new Date(settings.lastAutoBackupAt).getTime() : 0;
   if(Date.now() - last < AUTO_BACKUP_INTERVAL_MS) return;
-  const ok = await exportBackup(true);
-  if(ok){ settings.lastAutoBackupAt = new Date().toISOString(); persistSettings(); }
+  if(Date.now() - backupBannerDismissedAt < 60*60*1000) return; // se dispensou, não insiste na mesma hora
+  const host = document.getElementById('backupBannerHost');
+  if(!host) return;
+  host.innerHTML = `<div class="warning-fixed" style="top:calc(64px + env(safe-area-inset-top))"><div class="warning-banner" style="background:#EEF0F5; border-color:#D6DAE6; color:#3D4250; align-items:center">
+    <div style="flex:1">Faz um tempo que não tem backup. Quer fazer agora?</div>
+    <button id="backupNowBtn" style="background:var(--ink); color:#fff; border-radius:8px; padding:5px 10px; font-size:.72rem; font-weight:600; flex-shrink:0">Fazer backup</button>
+    <button id="backupDismissBtn" style="flex-shrink:0">${icon('x',14,'#3D4250')}</button>
+  </div></div>`;
+  document.getElementById('backupNowBtn').addEventListener('click', ()=> exportBackup(false));
+  document.getElementById('backupDismissBtn').addEventListener('click', ()=>{ backupBannerDismissedAt = Date.now(); hideBackupBanner(); });
 }
 
 async function importBackup(file){
@@ -1488,7 +1505,7 @@ renderQuickActions();
 renderFilters();
 renderAll();
 loadProfilePhoto();
-autoBackupIfNeeded();
+checkBackupBanner();
 </script>
 </body>
 </html>
