@@ -706,10 +706,13 @@ function openEntryModal(category, editId){
       h += `<div class="field"><label>Remédio</label>
         <div class="pickgrid" id="medPick">${meds.map(m=>{
           const sub = `${m.horario?m.horario:''}${m.horario&&m.dose?' · ':''}${m.dose?esc(m.dose):''}`;
-          return `<button type="button" class="med-pick-btn ${form.title===m.name?'sel':''}" style="${form.title===m.name?`background:${cat.hex}`:''}" data-name="${esc(m.name)}" data-dose="${esc(m.dose||'')}" data-horario="${esc(m.horario||'')}">
+          const tag = quickPick ? 'div' : 'button';
+          const typeAttr = quickPick ? '' : 'type="button"';
+          const cursorStyle = quickPick ? 'cursor:default;' : '';
+          return `<${tag} ${typeAttr} class="med-pick-btn ${form.title===m.name?'sel':''}" style="${cursorStyle}${form.title===m.name?`background:${cat.hex}`:''}" data-name="${esc(m.name)}" data-dose="${esc(m.dose||'')}" data-horario="${esc(m.horario||'')}">
             <div class="mp-name">${esc(m.name)}</div>
             ${sub?`<div class="mp-sub">${sub}</div>`:''}
-          </button>`;
+          </${tag}>`;
         }).join('') || '<span class="hint">Nenhum remédio cadastrado ainda.</span>'}</div>
         <button type="button" class="link-btn" id="openMedMgr" style="color:${cat.hex}; margin-top:8px">+ Gerenciar remédios</button>
       </div>`;
@@ -746,7 +749,7 @@ function openEntryModal(category, editId){
       ${settings.sheetLink ? `<a href="${esc(settings.sheetLink)}" target="_blank" rel="noreferrer" class="link-btn" style="color:${cat.hex}; margin-bottom:14px; display:inline-flex; align-items:center; gap:5px">${icon('external',13,cat.hex)} Ver planilha de exames</a>` : ''}`;
     }
     if(quickPick){
-      h += `<div class="hint">Toque num remédio acima pra registrar agora, com o horário programado. Pra lançar uma dose de outro dia, registre e depois edite o horário direto no registro.</div>`;
+      h += `<div class="hint">Pra registrar, use o checklist na tela principal. Aqui é só pra consultar o que está cadastrado.</div>`;
       return h;
     }
     h += `<div class="field"><label>Data e hora</label><div class="row2">
@@ -767,7 +770,7 @@ function openEntryModal(category, editId){
     host.innerHTML = `<div class="overlay" id="ovEntry">
       <div class="sheet" id="sheetEntry">
         <div class="sheet-head">
-          <div class="sheet-title" style="color:${cat.hex}">${icon(cat.icon,17,cat.hex)}<span style="color:var(--ink)">${editing?'Editar':'Novo'} · ${cat.label}</span></div>
+          <div class="sheet-title" style="color:${cat.hex}">${icon(cat.icon,17,cat.hex)}<span style="color:var(--ink)">${quickPick? 'Remédios atuais' : `${editing?'Editar':'Novo'} · ${cat.label}`}</span></div>
           <div style="display:flex; gap:6px">
             ${editing? `<button class="icon-btn danger" id="btnDelEntry">${icon('trash',17,'#A8473A')}</button>` : ''}
             <button class="icon-btn" id="btnCloseEntry">${icon('x',18)}</button>
@@ -803,12 +806,11 @@ function openEntryModal(category, editId){
     const openFM = document.getElementById('openFoodMgr'); if(openFM) openFM.addEventListener('click', ()=> openFoodManager(()=>{ refreshBody(); }));
 
     const medPick = document.getElementById('medPick');
-    if(medPick) medPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
+    if(medPick && !quickPick) medPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
       form.title=b.dataset.name;
       if(!form.note && b.dataset.dose) form.note=b.dataset.dose;
       if(!editing && b.dataset.horario) form.dateT=b.dataset.horario;
-      if(quickPick) save();
-      else refreshBody();
+      refreshBody();
     }));
     const openMM = document.getElementById('openMedMgr'); if(openMM) openMM.addEventListener('click', ()=> openMedManager(()=>{ refreshBody(); }));
 
