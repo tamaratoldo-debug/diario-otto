@@ -1507,21 +1507,30 @@ function openMedManager(onDone, jumpToId){
       <div class="field"><label>Tipo</label><div class="tipo-toggle">
         <button data-tipo="continuo" class="${draft.tipo==='continuo'?'sel':''}">Contínuo</button>
         <button data-tipo="pontual" class="${draft.tipo==='pontual'?'sel':''}">Pontual (início e fim)</button>
+        <button data-tipo="unica" class="${draft.tipo==='unica'?'sel':''}">Dose única</button>
       </div></div>
       ${draft.tipo==='pontual'? `
         <div class="field"><label>Início</label>${dtField('d_inicio','date',draft.dataInicio)}</div>
         <div class="field"><label>Fim</label>${dtField('d_fim','date',draft.dataFim)}</div>
       ` : ''}
+      ${draft.tipo==='unica'? `<div class="hint" style="margin-bottom:4px">Registra a dose agora mesmo, na hora. Não fica cadastrado pra aparecer de novo depois.</div>` : ''}
       <div class="field"><label>Dose / instruções (opcional)</label><input id="d_dose" autocomplete="off" value="${esc(draft.dose)}" placeholder="ex: 1 comprimido"/></div>
-      <div class="field"><label>Horário programado (opcional)</label>${dtField('d_horario','time',draft.horario)}
+      <div class="field"><label>${draft.tipo==='unica'?'Horário da dose':'Horário programado (opcional)'}</label>${dtField('d_horario','time',draft.horario)}
       </div>
       <div style="display:flex; gap:8px; margin-top:4px">
         <button class="btn-secondary" id="cancelAdd" style="flex:1">Cancelar</button>
-        <button class="btn-primary" id="confirmAdd" ${draft.name.trim()?'':'disabled'}>${editingId?'Salvar':'Adicionar'}</button>
+        <button class="btn-primary" id="confirmAdd" ${draft.name.trim()?'':'disabled'}>${draft.tipo==='unica'?'Registrar':(editingId?'Salvar':'Adicionar')}</button>
       </div>
     </div>`;
     document.getElementById('d_name').addEventListener('input', e=>{ draft.name=e.target.value; document.getElementById('confirmAdd').disabled = !draft.name.trim(); });
-    document.querySelectorAll('[data-tipo]').forEach(b=> b.addEventListener('click', ()=>{ draft.tipo=b.dataset.tipo; renderAddArea(); }));
+    document.querySelectorAll('[data-tipo]').forEach(b=> b.addEventListener('click', ()=>{
+      draft.tipo=b.dataset.tipo;
+      if(draft.tipo==='unica' && !draft.horario){
+        const now = new Date();
+        draft.horario = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+      }
+      renderAddArea();
+    }));
     wireDtField('d_inicio', v=> draft.dataInicio=v);
     wireDtField('d_fim', v=> draft.dataFim=v);
     document.getElementById('d_dose').addEventListener('input', e=> draft.dose=e.target.value);
@@ -1529,6 +1538,19 @@ function openMedManager(onDone, jumpToId){
     document.getElementById('cancelAdd').addEventListener('click', ()=>{ adding=false; editingId=null; syncMedListVisibility(); renderAddArea(); });
     document.getElementById('confirmAdd').addEventListener('click', ()=>{
       const n = draft.name.trim(); if(!n) return;
+
+      if(draft.tipo==='unica'){
+        let date = new Date();
+        if(draft.horario){ const [h,m2] = draft.horario.split(':').map(Number); date.setHours(h,m2,0,0); }
+        entries.push({ id:genId(), category:'remedio', medId:null, title:n, note:draft.dose.trim(), date:date.toISOString(), createdAt:Date.now() });
+        entries.sort((a,b)=> new Date(b.date)-new Date(a.date));
+        persistEntries();
+        closeModal();
+        renderAll();
+        showSuccess('Dose registrada.');
+        return;
+      }
+
       const duplicate = list.some(m=> m.name.toLowerCase()===n.toLowerCase() && (m.horario||'')===(draft.horario||'') && m.id!==editingId);
       if(duplicate){
         showWarning(`Já existe "${n}" cadastrado nesse mesmo horário. Edite o existente ou use um horário diferente.`);
