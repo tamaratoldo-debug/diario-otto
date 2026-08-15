@@ -106,6 +106,9 @@
   .row2 .field{flex:1}
   .pickgrid{display:flex; flex-wrap:wrap; gap:6px}
   .pick-btn{font-size:.85rem; font-weight:500; padding:9px 13px; border-radius:10px; border:none; background:#F1EEE6; color:var(--ink); cursor:pointer}
+  .med-pick-btn{font-family:inherit; text-align:left; padding:9px 13px; border-radius:10px; border:none; background:#F1EEE6; color:var(--ink); cursor:pointer}
+  .med-pick-btn .mp-name{font-size:.85rem; font-weight:500}
+  .med-pick-btn .mp-sub{font-size:.68rem; opacity:.75; margin-top:2px}
   .pick-btn.sel{color:#fff}
   .como-list{display:flex; flex-direction:column; gap:6px}
   .como-btn{text-align:left; font-size:.88rem; font-weight:500; padding:11px 13px; border-radius:10px; border:none; background:#F1EEE6; color:var(--ink); cursor:pointer}
@@ -309,6 +312,19 @@ function resizeImageFile(file, maxDim=1600, quality=0.85){
 let entries = store.get('otto:entries', []);
 let foods = store.get('otto:foods', []);
 let meds = store.get('otto:meds', []);
+(function dedupeMeds(){
+  const seen = new Set();
+  const deduped = meds.filter(m=>{
+    const key = m.name.trim().toLowerCase();
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  if(deduped.length !== meds.length){
+    meds = deduped;
+    store.set('otto:meds', meds);
+  }
+})();
 let chips = {
   intercorrencia: store.get('otto:intercorrencia-chips', []),
   consulta: store.get('otto:consulta-chips', []),
@@ -569,7 +585,13 @@ function openEntryModal(category, editId){
     }
     if(category==='remedio'){
       h += `<div class="field"><label>Remédio</label>
-        <div class="pickgrid" id="medPick">${meds.map(m=>`<button type="button" class="pick-btn ${form.title===m.name?'sel':''}" style="${form.title===m.name?`background:${cat.hex}`:''}" data-name="${esc(m.name)}" data-dose="${esc(m.dose||'')}" data-horario="${esc(m.horario||'')}">${esc(m.name)}</button>`).join('') || '<span class="hint">Nenhum remédio cadastrado ainda.</span>'}</div>
+        <div class="pickgrid" id="medPick">${meds.map(m=>{
+          const sub = `${m.horario?m.horario:''}${m.horario&&m.dose?' · ':''}${m.dose?esc(m.dose):''}`;
+          return `<button type="button" class="med-pick-btn ${form.title===m.name?'sel':''}" style="${form.title===m.name?`background:${cat.hex}`:''}" data-name="${esc(m.name)}" data-dose="${esc(m.dose||'')}" data-horario="${esc(m.horario||'')}">
+            <div class="mp-name">${esc(m.name)}</div>
+            ${sub?`<div class="mp-sub">${sub}</div>`:''}
+          </button>`;
+        }).join('') || '<span class="hint">Nenhum remédio cadastrado ainda.</span>'}</div>
         <button type="button" class="link-btn" id="openMedMgr" style="color:${cat.hex}; margin-top:8px">+ Gerenciar remédios</button>
         <div class="hint">Dica: pra remédios de hoje, use o checklist na tela principal — é mais rápido que abrir esse formulário.</div>
       </div>`;
@@ -957,6 +979,10 @@ function openMedManager(onDone){
     document.getElementById('cancelAdd').addEventListener('click', ()=>{ adding=false; renderAddArea(); });
     document.getElementById('confirmAdd').addEventListener('click', ()=>{
       const n = draft.name.trim(); if(!n) return;
+      if(list.some(m=> m.name.toLowerCase()===n.toLowerCase())){
+        showWarning(`"${n}" já está cadastrado. Edite o existente em vez de duplicar.`);
+        return;
+      }
       list.push({ id:genId(), name:n, tipo:draft.tipo, dataInicio: draft.tipo==='pontual'?draft.dataInicio:'', dataFim: draft.tipo==='pontual'?draft.dataFim:'', dose:draft.dose.trim(), horario:draft.horario });
       adding=false;
       render();
