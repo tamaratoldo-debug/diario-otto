@@ -72,7 +72,6 @@
   .day-square.active .ds-n{color:#fff}
   .day-square .ds-w{font-size:.6rem; font-weight:500; color:var(--ink-muted); text-transform:uppercase}
   .day-square.active .ds-w{color:rgba(255,255,255,.65)}
-  .day-square .ds-dots{display:flex; gap:2px; min-height:5px; margin-top:1px}
   .day-card{background:#fff; border-radius:12px; padding:12px; display:flex; gap:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); margin-bottom:8px}
   .day-num{display:flex; flex-direction:column; align-items:center; width:44px; flex-shrink:0; padding-top:2px}
   .day-num .n{font-weight:700; font-size:1.3rem; line-height:1}
@@ -670,13 +669,10 @@ function renderTimeline(){
       const dayNum = fmtDay(refDate);
       const weekday = fmtWeekdayShort(refDate);
       const isExpanded = expandedDays.has(day.key);
-      const dotCats = [...new Set(day.items.filter(e=>e.category!=='remedio').map(e=>e.category))];
-      const dotsHtml = dotCats.map(c=>`<span style="width:5px; height:5px; border-radius:50%; background:${CATEGORIES[c].hex}; display:inline-block"></span>`).join('');
 
       squaresHtml += `<button class="day-square${isExpanded?' active':''}" data-daysquare="${esc(day.key)}">
         <div class="ds-n">${dayNum}</div>
         <div class="ds-w">${weekday}</div>
-        <div class="ds-dots">${dotsHtml}</div>
       </button>`;
 
       if(isExpanded){
@@ -696,8 +692,14 @@ function renderTimeline(){
   host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med)));
   host.querySelectorAll('[data-daysquare]').forEach(b=> b.addEventListener('click', ()=>{
     const key = b.dataset.daysquare;
+    const posBefore = b.getBoundingClientRect().top;
     if(expandedDays.has(key)) expandedDays.delete(key); else expandedDays.add(key);
     renderTimeline();
+    const newBtn = host.querySelector(`[data-daysquare="${CSS.escape(key)}"]`);
+    if(newBtn){
+      const posAfter = newBtn.getBoundingClientRect().top;
+      window.scrollBy(0, posAfter - posBefore);
+    }
   }));
   const medsToggle = document.getElementById('medsSummaryToggle');
   if(medsToggle) medsToggle.addEventListener('click', ()=>{ medsExpanded = !medsExpanded; renderTimeline(); });
