@@ -8,10 +8,10 @@
 <meta name="apple-mobile-web-app-title" content="Diário do Otto" />
 <title>Diário do Otto</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#F5F6FA; --ink:#20242C; --ink-muted:#8A8F9C; --accent:#4C6FFF;
+    --bg:#FAF6EF; --ink:#20242C; --ink-muted:#8A8F9C; --accent:#4A6FE0;
     --c-alimentacao:#D98A2E; --c-alimentacao-bg:#FBEEDB;
     --c-remedio:#3EAE8A; --c-remedio-bg:#E0F4EC;
     --c-peso:#4C6FFF; --c-peso-bg:#E7ECFF;
@@ -26,20 +26,18 @@
   .display{font-family:'Space Grotesk',system-ui,sans-serif}
   .wrap{max-width:460px; margin:0 auto; padding:calc(20px + env(safe-area-inset-top)) 16px 0}
   .card{background:#fff; border-radius:16px; box-shadow:0 1px 2px rgba(0,0,0,0.04); margin:0 4px}
-  .hero{position:relative; border-radius:24px; overflow:hidden; height:190px; background:linear-gradient(135deg,#DCE3F0,#EAEDF5)}
+  .hero{position:relative; border-radius:24px; overflow:hidden; height:230px; background:linear-gradient(135deg,#DCE3F0,#EAEDF5)}
   .hero-photo{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
   .hero-noPhoto{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#AEB7D6}
-  .hero-gradient{position:absolute; inset:0; background:linear-gradient(to top, rgba(15,18,30,.62), rgba(15,18,30,0) 60%)}
+  .hero-gradient{position:absolute; inset:0; background:linear-gradient(to top, rgba(15,18,30,.68), rgba(15,18,30,0) 55%)}
   .hero-settings{position:absolute; top:14px; right:14px; z-index:2; background:rgba(255,255,255,.28); border:none; color:#fff; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(6px)}
-  .hero-content{position:absolute; left:0; right:0; bottom:0; z-index:1; padding:16px 18px; color:#fff}
-  .hero-name{font-weight:700; font-size:1.35rem; line-height:1.1; display:flex; align-items:center; gap:8px}
-  .hero-meta{font-size:.8rem; color:rgba(255,255,255,.88); margin-top:4px; display:flex; align-items:center; gap:6px; flex-wrap:wrap}
-  .hero-delta{display:inline-flex; align-items:center; gap:3px; font-size:.72rem; font-weight:500; padding:2px 7px; border-radius:999px; background:rgba(255,255,255,.18)}
+  .hero-content{position:absolute; left:0; right:0; bottom:0; z-index:1; padding:18px 20px 20px}
+  .hero-name{font-family:'Fraunces',serif; font-weight:600; font-size:2rem; line-height:1; color:#fff}
+  .hero-meta{font-size:.8rem; color:rgba(255,255,255,.85); margin-top:6px}
 
-  .quick{padding:16px 12px; margin-top:-16px; position:relative; display:grid; grid-template-columns:repeat(4,1fr); gap:10px 4px}
-  .quick button{border:none; background:none; padding:0; display:flex; flex-direction:column; align-items:center; gap:7px; font-family:inherit; cursor:pointer}
-  .quick .icon-circle{width:50px; height:50px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0}
-  .quick button span.lbl{font-size:.68rem; font-weight:500; color:var(--ink); text-align:center; line-height:1.15}
+  .pill-row{display:flex; gap:8px; overflow-x:auto; padding:0 4px 4px; margin:-22px 0 0; position:relative; z-index:3; scrollbar-width:none}
+  .pill-row::-webkit-scrollbar{display:none}
+  .pill{flex-shrink:0; display:flex; align-items:center; gap:7px; background:var(--accent); color:#fff; border:none; border-radius:999px; padding:11px 16px; font-family:inherit; font-size:.8rem; font-weight:600; cursor:pointer; box-shadow:0 6px 14px rgba(74,111,224,.28)}
 
   .section{margin-top:16px; padding:16px}
   .link-btn{background:none; border:none; font-size:.75rem; font-weight:600; display:flex; align-items:center; gap:4px; cursor:pointer; padding:0}
@@ -136,7 +134,7 @@
 <div class="wrap">
   <div class="hero" id="heroCard"></div>
 
-  <div class="card quick" id="quickActions"></div>
+  <div class="pill-row" id="quickActions"></div>
 
   <div class="card section" id="chartSection" style="display:none">
     <div class="section-title" style="margin-bottom:8px">Evolução do peso</div>
@@ -357,18 +355,9 @@ function ageText(){
 function renderHero(){
   const pesoEntries = entries.filter(e=>e.category==='peso').slice().sort((a,b)=> new Date(a.date)-new Date(b.date));
   const last = pesoEntries[pesoEntries.length-1];
-  const prev = pesoEntries[pesoEntries.length-2];
 
-  const age = ageText();
-  const pesoStr = last ? `${last.value} kg` : '';
-  const metaParts = [age, pesoStr].filter(Boolean);
-
-  let deltaHtml = '';
-  if(last && prev){
-    const delta = +(last.value - prev.value).toFixed(2);
-    const arrow = delta>0 ? '<path d="M23 6l-9.5 9.5-5-5L1 18"/><path d="M17 6h6v6"/>' : delta<0 ? '<path d="M23 18l-9.5-9.5-5 5L1 6"/><path d="M17 18h6v-6"/>' : '<line x1="5" y1="12" x2="19" y2="12"/>';
-    deltaHtml = `<span class="hero-delta"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">${arrow}</svg>${delta>0?'+':''}${delta}kg</span>`;
-  }
+  const metaParts = [settings.raca, settings.sexo, ageText()].filter(Boolean);
+  if(last) metaParts.push(`${last.value} kg`);
 
   const heroHost = document.getElementById('heroCard');
   heroHost.innerHTML = `
@@ -376,8 +365,8 @@ function renderHero(){
     <div class="hero-gradient"></div>
     <button class="hero-settings" id="btnSettings" aria-label="Configurações">${icon('gear',17,'#fff')}</button>
     <div class="hero-content">
-      <div class="hero-name">${icon('paw',16,'#fff')} Otto</div>
-      <div class="hero-meta">${metaParts.join(' · ') || 'Adicione peso e idade'}${deltaHtml}</div>
+      <div class="hero-name">Otto</div>
+      <div class="hero-meta">${metaParts.join(' · ') || 'Adicione raça, idade e peso'}</div>
     </div>
   `;
   document.getElementById('btnSettings').addEventListener('click', openSettings);
@@ -405,10 +394,7 @@ function renderQuickActions(){
   const host = document.getElementById('quickActions');
   host.innerHTML = CATEGORY_ORDER.map(key=>{
     const cat = CATEGORIES[key];
-    return `<button data-cat="${key}">
-      <span class="icon-circle" style="background:${cat.bgHex}">${icon(cat.icon,20,cat.hex)}</span>
-      <span class="lbl">${cat.short}</span>
-    </button>`;
+    return `<button class="pill" data-cat="${key}">${icon(cat.icon,15,'#fff')}${cat.short}</button>`;
   }).join('');
   host.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=> openEntryModal(b.dataset.cat)));
 }
@@ -896,6 +882,14 @@ function openSettings(){
               : `<button type="button" id="addProfilePhotoBtn" class="add-trigger">${icon('camera',15)} Adicionar foto</button>`}
             <input type="file" id="profilePhotoInput" accept="image/*" style="display:none"/>
           </div>
+          <div class="row2">
+            <div class="field"><label>Raça (opcional)</label><input id="racaInput" value="${esc(settings.raca||'')}" placeholder="ex: Vira-lata"/></div>
+            <div class="field"><label>Sexo (opcional)</label><select id="sexoInput">
+              <option value="" ${!settings.sexo?'selected':''}></option>
+              <option value="Macho" ${settings.sexo==='Macho'?'selected':''}>Macho</option>
+              <option value="Fêmea" ${settings.sexo==='Fêmea'?'selected':''}>Fêmea</option>
+            </select></div>
+          </div>
           <div class="field"><label>Data de nascimento (opcional, pra mostrar a idade)</label><input id="birthdateInput" type="date" value="${settings.birthdate||''}"/></div>
           <div class="field"><label>Link da planilha de exames (Google Sheets)</label><input id="linkInput" value="${esc(settings.sheetLink)}" placeholder="https://..."/></div>
         </div>
@@ -930,6 +924,8 @@ function openSettings(){
       saving = true; render();
       settings.sheetLink = document.getElementById('linkInput').value.trim();
       settings.birthdate = document.getElementById('birthdateInput').value;
+      settings.raca = document.getElementById('racaInput').value.trim();
+      settings.sexo = document.getElementById('sexoInput').value;
       if(draftPhotoBlob){
         const newId = genId();
         try{
