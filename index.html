@@ -559,6 +559,95 @@ function showWarning(msg){
   document.getElementById('warnClose').addEventListener('click', ()=> document.getElementById('warningHost').innerHTML='');
 }
 
+function showSuccess(msg){
+  document.getElementById('warningHost').innerHTML = `<div class="warning-fixed"><div class="warning-banner" style="background:#E5F3EC; border-color:#B9DDC8; color:#2C6B47">${icon('check',15,'#2C6B47')}<div style="flex:1">${esc(msg)}</div><button id="warnClose">${icon('x',14,'#2C6B47')}</button></div></div>`;
+  document.getElementById('warnClose').addEventListener('click', ()=> document.getElementById('warningHost').innerHTML='');
+}
+
+function blobToDataUrl(blob){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=> resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function exportBackup(){
+  try{
+    const photoIds = new Set();
+    entries.forEach(e=>{ if(e.photoId) photoIds.add(e.photoId); });
+    if(settings.profilePhotoId) photoIds.add(settings.profilePhotoId);
+    const photos = {};
+    for(const id of photoIds){
+      try{
+        const blob = await idbGetPhoto(id);
+        if(blob) photos[id] = await blobToDataUrl(blob);
+      }catch(e){ console.error('Erro exportando foto', id, e); }
+    }
+    const data = { app:'diario-otto', version:1, exportedAt:new Date().toISOString(), entries, foods, meds, chips, settings, photos };
+    const blob = new Blob([JSON.stringify(data)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `diario-otto-backup-${todayStr()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=> URL.revokeObjectURL(url), 2000);
+    showSuccess('Backup exportado.');
+  }catch(err){
+    console.error('Erro ao exportar', err);
+    showWarning('Não consegui gerar o backup. Tenta de novo.');
+  }
+}
+
+async function importBackup(file){
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if(!data || data.app!=='diario-otto' || !Array.isArray(data.entries)) throw new Error('formato inválido');
+
+    entries = data.entries || [];
+    foods = data.foods || [];
+    meds = data.meds || [];
+    chips = {
+      intercorrencia: (data.chips && data.chips.intercorrencia) || [],
+      consulta: (data.chips && data.chips.consulta) || [],
+      clinica: (data.chips && data.chips.clinica) || [],
+      procedimento: (data.chips && data.chips.procedimento) || []
+    };
+    settings = data.settings || {sheetLink:''};
+
+    writeStore('otto:entries', entries);
+    writeStore('otto:foods', foods);
+    writeStore('otto:meds', meds);
+    writeStore('otto:intercorrencia-chips', chips.intercorrencia);
+    writeStore('otto:consulta-chips', chips.consulta);
+    writeStore('otto:clinica-chips', chips.clinica);
+    writeStore('otto:procedimento-chips', chips.procedimento);
+    writeStore('otto:settings', settings);
+
+    if(data.photos){
+      for(const id in data.photos){
+        try{
+          const blob = await (await fetch(data.photos[id])).blob();
+          await idbPutPhoto(id, blob);
+        }catch(e){ console.error('Erro importando foto', id, e); }
+      }
+    }
+
+    closeModal();
+    await loadProfilePhoto();
+    renderAll();
+    renderFilters();
+    showSuccess('Backup importado com sucesso.');
+  }catch(err){
+    console.error('Erro ao importar', err);
+    showWarning('Não consegui importar esse arquivo. Confira se é um backup válido do Diário do Otto.');
+  }
+}
+
 // ================= ENTRY MODAL =================
 function emptyForm(cat){
   const now = new Date();
@@ -905,6 +994,11 @@ function openSettings(){
           </div>
           <div class="field"><label>Data de nascimento (opcional, pra mostrar a idade)</label><input id="birthdateInput" type="date" value="${draftBirthdate}"/></div>
           <div class="field"><label>Link da planilha de exames (Google Sheets)</label><input id="linkInput" value="${esc(draftSheetLink)}" placeholder="https://..."/></div>
+          <div style="display:flex; justify-content:center; gap:16px; padding-top:10px; margin-top:6px; border-top:1px solid #F1EEE6">
+            <button type="button" id="exportBtn" style="background:none; border:none; font-size:.7rem; color:var(--ink-muted); cursor:pointer">Exportar dados</button>
+            <button type="button" id="importBtn" style="background:none; border:none; font-size:.7rem; color:var(--ink-muted); cursor:pointer">Importar dados</button>
+            <input type="file" id="importFileInput" accept="application/json" style="display:none"/>
+          </div>
         </div>
         <div class="sheet-foot"><button class="btn-primary" id="saveSet" ${saving?'disabled':''}>${saving?'Salvando...':'Salvar'}</button></div>
       </div>
@@ -913,6 +1007,16 @@ function openSettings(){
     const sexoEl = document.getElementById('sexoInput'); sexoEl.addEventListener('change', e=> draftSexo=e.target.value);
     const bdEl = document.getElementById('birthdateInput'); bdEl.addEventListener('input', e=> draftBirthdate=e.target.value);
     const linkEl = document.getElementById('linkInput'); linkEl.addEventListener('input', e=> draftSheetLink=e.target.value);
+    document.getElementById('exportBtn').addEventListener('click', exportBackup);
+    const importFileEl = document.getElementById('importFileInput');
+    document.getElementById('importBtn').addEventListener('click', ()=> importFileEl.click());
+    importFileEl.addEventListener('change', async (e)=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      if(!confirm('Isso substitui todos os dados atuais pelos do arquivo de backup. Continuar?')) { importFileEl.value=''; return; }
+      await importBackup(file);
+      importFileEl.value = '';
+    });
     document.getElementById('ovSet').addEventListener('click', e=>{ if(e.target.id==='ovSet' && !saving) closeModal(); });
     document.getElementById('closeSet').addEventListener('click', ()=>{ if(!saving) closeModal(); });
 
