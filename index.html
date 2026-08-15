@@ -38,24 +38,16 @@
   .quick button span{font-size:.68rem; font-weight:500; color:var(--ink); text-align:center; line-height:1.1}
 
   .section{margin-top:16px; padding:16px}
-  .section-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px}
-  .section-title{font-size:.9rem; font-weight:600}
   .link-btn{background:none; border:none; font-size:.75rem; font-weight:600; display:flex; align-items:center; gap:4px; cursor:pointer; padding:0}
-  .empty-note{font-size:.75rem; color:var(--ink-muted); padding:4px 0}
+  .section-title{font-size:.9rem; font-weight:600}
 
-  .med-row{display:flex; align-items:center; gap:12px; background:#FBFAF7; border-radius:12px; padding:10px 12px; margin-bottom:8px}
   .pending-checkbox{width:18px; height:18px; border-radius:50%; border:2px solid #7FB89A; flex-shrink:0; display:inline-block}
   .photo-preview{position:relative; display:inline-block; margin-top:2px}
   .photo-preview img{width:100px; height:100px; object-fit:cover; border-radius:10px; display:block; border:1px solid #E5E0D4}
   .photo-remove{position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:999px; background:#A8473A; border:2px solid #fff; display:flex; align-items:center; justify-content:center; cursor:pointer}
-  .entry-thumb{width:44px; height:44px; object-fit:cover; border-radius:8px; margin-top:6px; border:1px solid #F1EEE6}
   .lightbox{position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:60; display:flex; align-items:center; justify-content:center; padding:20px}
   .lightbox img{max-width:100%; max-height:100%; border-radius:8px}
   .lightbox-close{position:absolute; top:20px; right:20px; width:40px; height:40px; border-radius:999px; background:rgba(255,255,255,.15); border:none; display:flex; align-items:center; justify-content:center}
-  .med-row:last-child{margin-bottom:0}
-  .check-btn{width:34px; height:34px; border-radius:999px; border:none; background:var(--c-remedio); color:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; cursor:pointer}
-  .med-name{font-size:.9rem; font-weight:500}
-  .med-sub{font-size:.7rem; color:var(--ink-muted)}
 
   .chart-wrap{height:130px; margin-top:4px}
 
@@ -85,7 +77,8 @@
 
   .empty-state{text-align:center; padding:56px 0; color:var(--ink-muted)}
 
-  .warning-banner{display:flex; gap:8px; background:#FBEAE7; border:1px solid #E3B5AC; border-radius:12px; padding:10px 12px; margin:12px 4px 0; font-size:.75rem; color:#8A3A30; align-items:flex-start}
+  .warning-fixed{position:fixed; top:calc(12px + env(safe-area-inset-top)); left:0; right:0; z-index:70; display:flex; justify-content:center; padding:0 16px; pointer-events:none}
+  .warning-banner{display:flex; gap:8px; background:#FBEAE7; border:1px solid #E3B5AC; border-radius:12px; padding:10px 12px; font-size:.75rem; color:#8A3A30; align-items:flex-start; max-width:460px; width:100%; pointer-events:auto; box-shadow:0 4px 16px rgba(0,0,0,.12)}
   .warning-banner button{background:none; border:none; flex-shrink:0}
 
   /* Modal / bottom sheet */
@@ -235,6 +228,7 @@ const fmtTime = iso=> new Date(iso).toLocaleTimeString('pt-BR',{hour:'2-digit',m
 const fmtMonthYear = iso=>{ const s=new Date(iso).toLocaleDateString('pt-BR',{month:'long',year:'numeric'}); return s.charAt(0).toUpperCase()+s.slice(1); };
 const fmtDateShort = ds=>{ if(!ds) return '?'; const [y,m,d]=ds.split('-'); return `${d}/${m}/${y.slice(2)}`; };
 const isSameDay = (iso, ds)=>{ const d=new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`===ds; };
+const toLocalDateStr = (d)=> `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const isMedActiveToday = med=>{ if(med.tipo==='continuo') return true; const t=todayStr(); if(med.dataInicio && t<med.dataInicio) return false; if(med.dataFim && t>med.dataFim) return false; return true; };
 const esc = s => (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -365,10 +359,10 @@ function renderHero(){
     const vals = pesoEntries.map(e=>e.value);
     const min = Math.min(...vals), max = Math.max(...vals);
     const range = (max-min)||1;
-    const w=400,h=130,pad=10;
+    const w=400,h=130,chartPad=10;
     const pts = pesoEntries.map((e,i)=>{
-      const x = pad + (i/(pesoEntries.length-1||1))*(w-2*pad);
-      const y = h-pad - ((e.value-min)/range)*(h-2*pad);
+      const x = chartPad + (i/(pesoEntries.length-1||1))*(w-2*chartPad);
+      const y = h-chartPad - ((e.value-min)/range)*(h-2*chartPad);
       return [x,y];
     });
     const path = pts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
@@ -538,7 +532,7 @@ function openLightbox(src){
 
 // ---------- warning banner ----------
 function showWarning(msg){
-  document.getElementById('warningHost').innerHTML = `<div class="wrap"><div class="warning-banner">${icon('alert',15,'#A8473A')}<div style="flex:1">${esc(msg)}</div><button id="warnClose">${icon('x',14,'#A8473A')}</button></div></div>`;
+  document.getElementById('warningHost').innerHTML = `<div class="warning-fixed"><div class="warning-banner">${icon('alert',15,'#A8473A')}<div style="flex:1">${esc(msg)}</div><button id="warnClose">${icon('x',14,'#A8473A')}</button></div></div>`;
   document.getElementById('warnClose').addEventListener('click', ()=> document.getElementById('warningHost').innerHTML='');
 }
 
@@ -553,7 +547,7 @@ function openEntryModal(category, editId){
   if(editId){ editing = entries.find(e=>e.id===editId); category = editing.category; }
   let form = editing ? {
     title: editing.title||'', quantidade: editing.quantidade||'',
-    dateD: editing.date.slice(0,10), dateT: fmtTime(editing.date),
+    dateD: toLocalDateStr(new Date(editing.date)), dateT: fmtTime(editing.date),
     note: editing.note||'', value: editing.value ?? '', gravidade: editing.gravidade||'',
     comoComeu: editing.comoComeu||'', clinica: editing.clinica||'', tipoExame: editing.tipoExame||EXAME_TIPOS[0],
     photo: editing.photo||'', photoBlob:null, photoId: editing.photoId||'', removedPhoto:false
@@ -733,7 +727,7 @@ function openEntryModal(category, editId){
       refreshBody();
     });
     if(removeBtn) removeBtn.addEventListener('click', ()=>{
-      form.photo=''; form.photoBlob=null; form.removedPhoto = !!form.photoId;
+      form.photo=''; form.photoBlob=null; form.removedPhoto = true;
       refreshBody();
     });
     if(thumb) thumb.addEventListener('click', ()=> openLightbox(form.photo));
@@ -911,6 +905,7 @@ function openFoodManager(onDone){
     document.getElementById('closeFood').addEventListener('click', finish);
     document.getElementById('doneFoodBtn').addEventListener('click', finish);
     document.getElementById('addFoodBtn').addEventListener('click', addFood);
+    document.getElementById('newFoodName').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); addFood(); } });
     document.querySelectorAll('#foodList .del-btn').forEach(b=> b.addEventListener('click', ()=>{ list = list.filter(f=>f.id!==b.dataset.id); render(); }));
     document.querySelectorAll('#foodList [data-expand]').forEach(b=> b.addEventListener('click', ()=>{ expanded = expanded===b.dataset.expand ? null : b.dataset.expand; render(); }));
   }
