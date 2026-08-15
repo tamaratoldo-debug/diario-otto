@@ -621,7 +621,7 @@ function renderTimeline(){
 
   for(const month of months){
     const isCollapsed = collapsedMonths.has(month.key);
-    html += `<button class="month-label" data-month="${esc(month.key)}" style="display:flex; align-items:center; justify-content:space-between; width:100%; background:none; border:none; cursor:pointer; font-family:inherit; padding:0">
+    html += `<button class="month-label" data-month="${esc(month.key)}" style="display:flex; align-items:center; justify-content:flex-start; gap:6px; width:100%; background:none; border:none; cursor:pointer; font-family:inherit; padding:0">
       <span>${month.key}</span>${icon(isCollapsed?'chevronDown':'chevronUp',13,'var(--ink-muted)')}
     </button>`;
     if(isCollapsed) continue;
