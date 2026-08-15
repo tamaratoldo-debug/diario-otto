@@ -698,7 +698,7 @@ function blobToDataUrl(blob){
   });
 }
 
-async function exportBackup(){
+async function exportBackup(silent){
   try{
     const photoIds = new Set();
     entries.forEach(e=>{ if(e.photoId) photoIds.add(e.photoId); });
@@ -720,11 +720,26 @@ async function exportBackup(){
     a.click();
     document.body.removeChild(a);
     setTimeout(()=> URL.revokeObjectURL(url), 2000);
-    showSuccess('Backup exportado.');
+    if(!silent) showSuccess('Backup exportado.');
+    return true;
   }catch(err){
     console.error('Erro ao exportar', err);
-    showWarning('Não consegui gerar o backup. Tenta de novo.');
+    if(!silent) showWarning('Não consegui gerar o backup. Tenta de novo.');
+    return false;
   }
+}
+
+// Backup automático e silencioso: roda sozinho quando o app é aberto, sem
+// precisar que a pessoa lembre de clicar em nada. Como não existe processo
+// rodando em segundo plano num site estático, isso só dispara nos momentos
+// em que o app é de fato aberto — não é literalmente 2x ao dia no relógio,
+// é "na primeira vez que abrir depois de 12h desde o último backup".
+const AUTO_BACKUP_INTERVAL_MS = 12*60*60*1000; // 12h
+async function autoBackupIfNeeded(){
+  const last = settings.lastAutoBackupAt ? new Date(settings.lastAutoBackupAt).getTime() : 0;
+  if(Date.now() - last < AUTO_BACKUP_INTERVAL_MS) return;
+  const ok = await exportBackup(true);
+  if(ok){ settings.lastAutoBackupAt = new Date().toISOString(); persistSettings(); }
 }
 
 async function importBackup(file){
@@ -1197,8 +1212,7 @@ function openSettings(){
           <div class="field"><label>Link da planilha de exames (Google Sheets)</label><input id="linkInput" value="${esc(draftSheetLink)}" placeholder="https://..."/></div>
           <div class="field"><label>Link do app da creche</label><input id="crecheLinkInput" value="${esc(draftCrecheLink)}" placeholder="https://..."/></div>
           <div style="display:flex; justify-content:center; gap:16px; padding-top:10px; margin-top:6px; border-top:1px solid #F1EEE6">
-            <button type="button" id="exportBtn" style="background:none; border:none; font-size:.7rem; color:var(--ink-muted); cursor:pointer">Exportar dados</button>
-            <button type="button" id="importBtn" style="background:none; border:none; font-size:.7rem; color:var(--ink-muted); cursor:pointer">Importar dados</button>
+            <button type="button" id="importBtn" style="background:none; border:none; font-size:.7rem; color:var(--ink-muted); cursor:pointer">Restaurar backup</button>
             <input type="file" id="importFileInput" accept="application/json" style="display:none"/>
           </div>
         </div>
@@ -1210,7 +1224,6 @@ function openSettings(){
     wireDtField('birthdateInput', v=> draftBirthdate=v);
     const linkEl = document.getElementById('linkInput'); linkEl.addEventListener('input', e=> draftSheetLink=e.target.value);
     const crecheLinkEl = document.getElementById('crecheLinkInput'); crecheLinkEl.addEventListener('input', e=> draftCrecheLink=e.target.value);
-    document.getElementById('exportBtn').addEventListener('click', exportBackup);
     const importFileEl = document.getElementById('importFileInput');
     document.getElementById('importBtn').addEventListener('click', ()=> importFileEl.click());
     importFileEl.addEventListener('change', async (e)=>{
@@ -1475,6 +1488,7 @@ renderQuickActions();
 renderFilters();
 renderAll();
 loadProfilePhoto();
+autoBackupIfNeeded();
 </script>
 </body>
 </html>
