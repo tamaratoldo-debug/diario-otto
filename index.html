@@ -528,7 +528,7 @@ function pendingRowsHtml(activeMeds, adHocEntries){
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
         <div class="entry-sub">${sub}</div>
       </button>
-      <button data-med="${m.id}" aria-label="${given?'Dado hoje, toque pra desfazer':'Marcar como dado'}" style="background:none; border:none; padding:6px; margin:-6px -6px -6px 0; cursor:pointer; flex-shrink:0">
+      <button data-med="${m.id}" aria-label="${given?'Dado hoje, toque pra desfazer':'Marcar como dado'}" style="background:none; border:none; padding:6px; margin:0 -6px 0 0; cursor:pointer; flex-shrink:0">
         <span class="pending-checkbox" style="${given?`background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}`:''}">${given?icon('check',11,'#fff'):''}</span>
       </button>`;
     return { sortKey: m.horario||'99:99', inner };
@@ -540,14 +540,14 @@ function pendingRowsHtml(activeMeds, adHocEntries){
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(e.title)}</span></div>
         <div class="entry-sub">${sub}</div>
       </button>
-      <span class="pending-checkbox" style="background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}; margin:6px 0 6px 6px; flex-shrink:0">${icon('check',11,'#fff')}</span>`;
+      <span class="pending-checkbox" style="background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}; flex-shrink:0">${icon('check',11,'#fff')}</span>`;
     return { sortKey: fmtTime(e.date), inner };
   });
 
   const allRows = [...medRows, ...adHocRows].sort((a,b)=> a.sortKey.localeCompare(b.sortKey));
-  const rows = allRows.map((row, idx)=> `<div class="entry-row" style="display:flex; align-items:flex-start; gap:8px; cursor:default; ${idx===allRows.length-1?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)'}">${row.inner}</div>`).join('');
+  const rows = allRows.map((row, idx)=> `<div class="entry-row" style="display:flex; align-items:center; gap:8px; cursor:default; padding:10px 0; ${idx===allRows.length-1?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)'}">${row.inner}</div>`).join('');
 
-  return `${header}<div style="background:${CATEGORIES.remedio.hex}0F; border-radius:12px; padding:2px 10px; margin-bottom:8px">${rows}</div>`;
+  return `${header}<div style="background:${CATEGORIES.remedio.hex}0F; border-radius:12px; padding:0 10px; margin-bottom:8px">${rows}</div>`;
 }
 
 function toggleMedToday(medId){
