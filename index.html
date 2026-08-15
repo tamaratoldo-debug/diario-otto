@@ -1518,11 +1518,19 @@ function openMedManager(onDone, jumpToId){
       <div class="field"><label>${draft.tipo==='unica'?'Horário da dose':'Horário programado (opcional)'}</label>${dtField('d_horario','time',draft.horario)}
       </div>
       <div style="display:flex; gap:8px; margin-top:4px">
+        ${editingId? `<button class="btn-secondary" id="deleteMedBtn" style="color:#B3261E; padding:0 14px">${icon('trash',16,'#B3261E')}</button>` : ''}
         <button class="btn-secondary" id="cancelAdd" style="flex:1">Cancelar</button>
         <button class="btn-primary" id="confirmAdd" ${draft.name.trim()?'':'disabled'}>${draft.tipo==='unica'?'Registrar':(editingId?'Salvar':'Adicionar')}</button>
       </div>
     </div>`;
     document.getElementById('d_name').addEventListener('input', e=>{ draft.name=e.target.value; document.getElementById('confirmAdd').disabled = !draft.name.trim(); });
+    const deleteBtn = document.getElementById('deleteMedBtn');
+    if(deleteBtn) deleteBtn.addEventListener('click', ()=>{
+      if(!window.confirm(`Excluir "${draft.name}"? Essa ação não pode ser desfeita.`)) return;
+      list = list.filter(m=> m.id!==editingId);
+      adding=false; editingId=null;
+      render();
+    });
     document.querySelectorAll('[data-tipo]').forEach(b=> b.addEventListener('click', ()=>{
       draft.tipo=b.dataset.tipo;
       if(draft.tipo==='unica' && !draft.horario){
