@@ -715,21 +715,21 @@ function renderTimeline(){
     const key = b.dataset.daysquare;
     const card = host.querySelector(`[data-daycard="${CSS.escape(key)}"]`);
     const nowExpanded = !expandedDays.has(key);
-    // Se o quadrado tocado já está acima da parte visível da tela, abrir/fechar
-    // o card dele muda a altura da página inteira acima de onde você está
-    // olhando, e isso precisa de compensação manual — o navegador não faz
-    // isso sozinho aqui. Medimos a altura exata antes/depois e ajustamos a
-    // rolagem nessa quantidade exata, só quando necessário.
-    const aboveViewport = b.getBoundingClientRect().bottom < 0;
     const prevHeight = document.documentElement.scrollHeight;
+    const prevScrollY = window.scrollY;
+
     if(nowExpanded) expandedDays.add(key); else expandedDays.delete(key);
     b.classList.toggle('active', nowExpanded);
     if(card) card.style.display = nowExpanded ? '' : 'none';
-    if(aboveViewport){
-      const newHeight = document.documentElement.scrollHeight;
-      const target = window.scrollY + (newHeight - prevHeight);
-      // Força essa posição por alguns quadros seguidos, caso a rolagem por
-      // inércia do iOS ainda esteja em andamento e tente sobrescrever o ajuste.
+
+    // Testa a causa real do pulo, direto: a pagina ficou mais curta do que a
+    // posicao em que voce estava rolada? Se sim, o navegador vai te empurrar
+    // pra cima a forca pra caber — isso acontece tanto em paginas longas
+    // quanto curtas, entao nao depende de filtro ou quantidade de conteudo.
+    const newHeight = document.documentElement.scrollHeight;
+    const newMaxScroll = Math.max(0, newHeight - window.innerHeight);
+    if(prevScrollY > newMaxScroll){
+      const target = Math.max(0, prevScrollY + (newHeight - prevHeight));
       let frames = 0;
       (function enforce(){
         window.scrollTo(0, target);
