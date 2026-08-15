@@ -524,28 +524,30 @@ function pendingRowsHtml(activeMeds, adHocEntries){
   const medRows = sortedMeds.map(m=>{
     const given = dosesGivenToday(m).length > 0;
     const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}`;
-    return `<button data-med-edit="${m.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
+    const inner = `<button data-med-edit="${m.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
         <div class="entry-sub">${sub}</div>
       </button>
       <button data-med="${m.id}" aria-label="${given?'Dado hoje, toque pra desfazer':'Marcar como dado'}" style="background:none; border:none; padding:6px; margin:-6px -6px -6px 0; cursor:pointer; flex-shrink:0">
         <span class="pending-checkbox" style="${given?`background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}`:''}">${given?icon('check',11,'#fff'):''}</span>
       </button>`;
+    return { sortKey: m.horario||'99:99', inner };
   });
 
-  const adHocRows = adHocEntries.slice().sort((a,b)=> new Date(a.date)-new Date(b.date)).map(e=>{
+  const adHocRows = adHocEntries.map(e=>{
     const sub = [fmtTime(e.date), e.note].filter(Boolean).join(' · ');
-    return `<button data-id="${e.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
+    const inner = `<button data-id="${e.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(e.title)}</span></div>
         <div class="entry-sub">${sub}</div>
       </button>
       <span class="pending-checkbox" style="background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}; margin:6px 0 6px 6px; flex-shrink:0">${icon('check',11,'#fff')}</span>`;
+    return { sortKey: fmtTime(e.date), inner };
   });
 
-  const allRows = [...medRows, ...adHocRows];
-  const rows = allRows.map((inner, idx)=> `<div class="entry-row" style="display:flex; align-items:flex-start; gap:8px; cursor:default; ${idx===allRows.length-1?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)'}">${inner}</div>`).join('');
+  const allRows = [...medRows, ...adHocRows].sort((a,b)=> a.sortKey.localeCompare(b.sortKey));
+  const rows = allRows.map((row, idx)=> `<div class="entry-row" style="display:flex; align-items:flex-start; gap:8px; cursor:default; ${idx===allRows.length-1?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)'}">${row.inner}</div>`).join('');
 
-  return `${header}${rows}`;
+  return `${header}<div style="background:${CATEGORIES.remedio.hex}0F; border-radius:12px; padding:2px 10px; margin-bottom:8px">${rows}</div>`;
 }
 
 function toggleMedToday(medId){
