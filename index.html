@@ -315,7 +315,8 @@ let chips = {
   intercorrencia: store.get('otto:intercorrencia-chips', []),
   consulta: store.get('otto:consulta-chips', []),
   clinica: store.get('otto:clinica-chips', []),
-  procedimento: store.get('otto:procedimento-chips', [])
+  procedimento: store.get('otto:procedimento-chips', []),
+  quantidade: store.get('otto:quantidade-chips', [])
 };
 let settings = store.get('otto:settings', {sheetLink:''});
 if(!settings.sheetLink){
@@ -666,7 +667,8 @@ async function importBackup(file){
       intercorrencia: (data.chips && data.chips.intercorrencia) || [],
       consulta: (data.chips && data.chips.consulta) || [],
       clinica: (data.chips && data.chips.clinica) || [],
-      procedimento: (data.chips && data.chips.procedimento) || []
+      procedimento: (data.chips && data.chips.procedimento) || [],
+      quantidade: (data.chips && data.chips.quantidade) || []
     };
     settings = data.settings || {sheetLink:''};
 
@@ -677,6 +679,7 @@ async function importBackup(file){
     writeStore('otto:consulta-chips', chips.consulta);
     writeStore('otto:clinica-chips', chips.clinica);
     writeStore('otto:procedimento-chips', chips.procedimento);
+    writeStore('otto:quantidade-chips', chips.quantidade);
     writeStore('otto:settings', settings);
 
     if(data.photos){
@@ -734,7 +737,9 @@ function openEntryModal(category, editId){
         <div class="pickgrid" id="foodPick">${foods.map(f=>`<button type="button" class="pick-btn ${form.title===f.name?'sel':''}" style="${form.title===f.name?`background:${cat.hex}`:''}" data-name="${esc(f.name)}">${esc(f.name)}</button>`).join('') || '<span class="hint">Nenhum alimento cadastrado ainda.</span>'}</div>
         <button type="button" class="link-btn" id="openFoodMgr" style="color:${cat.hex}; margin-top:8px">+ Gerenciar alimentos</button>
       </div>
-      <div class="field"><label>Quantidade (opcional)</label><input id="f_quantidade" value="${esc(form.quantidade)}" placeholder="ex: 110g, 1 xícara, 1 lata"/></div>
+      <div class="field"><label>Quantidade (opcional)</label><input id="f_quantidade" value="${esc(form.quantidade)}" placeholder="ex: 110g, 1 xícara, 1 lata"/>
+        <div class="pickgrid" id="qtdPick" style="margin-top:6px">${suggestChips('quantidade', form.quantidade)}</div>
+      </div>
       <div class="field"><label>Como ele comeu</label><div class="como-list" id="comoList">${COMO_COMEU.map(([v,l])=>`<button type="button" class="como-btn ${form.comoComeu===v?'sel':''}" style="${form.comoComeu===v?`background:${cat.hex}`:''}" data-v="${v}">${l}</button>`).join('')}</div></div>`;
     }
     if(category==='remedio'){
@@ -868,7 +873,9 @@ function openEntryModal(category, editId){
 
     document.querySelectorAll('[data-sugg]').forEach(b=> b.addEventListener('click', ()=>{
       const kind=b.dataset.sugg, val=b.dataset.val;
-      if(kind==='clinica') form.clinica=val; else form.title=val;
+      if(kind==='clinica') form.clinica=val;
+      else if(kind==='quantidade') form.quantidade=val;
+      else form.title=val;
       refreshBody();
     }));
   }
@@ -955,7 +962,7 @@ function openEntryModal(category, editId){
     document.querySelectorAll('[data-g]').forEach(b=> b.addEventListener('click', ()=>{ form.gravidade = form.gravidade===b.dataset.g ? '' : b.dataset.g; refreshBody(); }));
     wirePhoto();
     const exPick = document.getElementById('exPick'); if(exPick) exPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.tipoExame=b.dataset.t; refreshBody(); }));
-    document.querySelectorAll('[data-sugg]').forEach(b=> b.addEventListener('click', ()=>{ const kind=b.dataset.sugg, val=b.dataset.val; if(kind==='clinica') form.clinica=val; else form.title=val; refreshBody(); }));
+    document.querySelectorAll('[data-sugg]').forEach(b=> b.addEventListener('click', ()=>{ const kind=b.dataset.sugg, val=b.dataset.val; if(kind==='clinica') form.clinica=val; else if(kind==='quantidade') form.quantidade=val; else form.title=val; refreshBody(); }));
   }
 
   function requestClose(){
@@ -1030,6 +1037,7 @@ function openEntryModal(category, editId){
       if(entry.clinica && !chips.clinica.includes(entry.clinica)){ chips.clinica.push(entry.clinica); persistChips('clinica'); }
     }
     if(category==='procedimento' && entry.title && !chips.procedimento.includes(entry.title)){ chips.procedimento.push(entry.title); persistChips('procedimento'); }
+    if(category==='alimentacao' && entry.quantidade && !chips.quantidade.includes(entry.quantidade)){ chips.quantidade.push(entry.quantidade); persistChips('quantidade'); }
 
     closeModal();
     renderAll();
