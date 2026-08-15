@@ -1340,10 +1340,10 @@ function openMedManager(onDone, jumpToId){
         <button data-tipo="continuo" class="${draft.tipo==='continuo'?'sel':''}">Contínuo</button>
         <button data-tipo="pontual" class="${draft.tipo==='pontual'?'sel':''}">Pontual (início e fim)</button>
       </div></div>
-      ${draft.tipo==='pontual'? `<div class="row2">
+      ${draft.tipo==='pontual'? `
         <div class="field"><label>Início</label><input id="d_inicio" type="date" autocomplete="off" value="${draft.dataInicio}"/></div>
         <div class="field"><label>Fim</label><input id="d_fim" type="date" autocomplete="off" value="${draft.dataFim}"/></div>
-      </div>` : ''}
+      ` : ''}
       <div class="field"><label>Dose / instruções (opcional)</label><input id="d_dose" autocomplete="off" value="${esc(draft.dose)}" placeholder="ex: 1 comprimido"/></div>
       <div class="field"><label>Horário programado (opcional)</label><input id="d_horario" type="time" autocomplete="off" value="${draft.horario}"/>
       </div>
