@@ -200,6 +200,8 @@ const ICONS = {
   syringe:'<path d="m18 2 4 4"/><path d="m17 7 3-3"/><path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5"/><path d="m9 11 4 4"/><path d="m5 19-3 3"/><path d="m14 4 6 6"/>',
   flask:'<path d="M10 2v7.31"/><path d="M14 9.3V2"/><path d="M8.5 2h7"/><path d="M14 9.3a6.5 6.5 0 1 1-4 0"/><path d="M5.52 16h12.96"/>',
   check:'<polyline points="20 6 9 17 4 12"/>',
+  chevronDown:'<path d="m6 9 6 6 6-6"/>',
+  chevronUp:'<path d="m18 15-6-6-6 6"/>',
   x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
   trash:'<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
@@ -319,6 +321,7 @@ if(!settings.sheetLink){
   store.set('otto:settings', settings);
 }
 let filter = 'todos';
+let medsExpanded = false;
 let search = '';
 let profilePhotoUrl = null;
 
@@ -421,7 +424,20 @@ function pendingMedsForToday(){
 }
 
 function pendingRowsHtml(activeMeds){
-  return activeMeds.map(m=>{
+  if(activeMeds.length===0) return '';
+  const sorted = activeMeds.slice().sort((a,b)=> (a.horario||'99:99').localeCompare(b.horario||'99:99'));
+  const givenCount = sorted.filter(m=> dosesGivenToday(m.id).length>0).length;
+
+  const header = `<button class="entry-row" id="medsSummaryToggle">
+    <div class="entry-top">
+      <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>Remédios de hoje</span></div>
+      <span style="display:flex; align-items:center; gap:4px; color:var(--ink-muted); font-size:.72rem; font-weight:600">${givenCount}/${sorted.length}${icon(medsExpanded?'chevronUp':'chevronDown',14,'var(--ink-muted)')}</span>
+    </div>
+  </button>`;
+
+  if(!medsExpanded) return header;
+
+  const rows = sorted.map(m=>{
     const given = dosesGivenToday(m.id).length > 0;
     const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}`;
     return `<button class="entry-row" data-med="${m.id}">
@@ -432,6 +448,8 @@ function pendingRowsHtml(activeMeds){
       <div class="entry-sub">${sub}</div>
     </button>`;
   }).join('');
+
+  return header + rows;
 }
 
 function toggleMedToday(medId){
@@ -559,6 +577,8 @@ function renderTimeline(){
   host.innerHTML = html;
   host.querySelectorAll('[data-id]').forEach(b=> b.addEventListener('click', ()=> openEntryModal(null, b.dataset.id)));
   host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med)));
+  const medsToggle = document.getElementById('medsSummaryToggle');
+  if(medsToggle) medsToggle.addEventListener('click', ()=>{ medsExpanded = !medsExpanded; renderTimeline(); });
 }
 
 function renderAll(){ renderHero(); renderTimeline(); }
