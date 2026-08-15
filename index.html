@@ -213,6 +213,7 @@ const ICONS = {
   check:'<polyline points="20 6 9 17 4 12"/>',
   clock:'<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
   calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  home:'<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
   chevronDown:'<path d="m6 9 6 6 6-6"/>',
   chevronUp:'<path d="m18 15-6-6-6 6"/>',
   x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
@@ -448,14 +449,28 @@ function renderHero(){
 // ---------- render: quick actions ----------
 function renderQuickActions(){
   const host = document.getElementById('quickActions');
-  host.innerHTML = CATEGORY_ORDER.map(key=>{
+  const catButtons = CATEGORY_ORDER.map(key=>{
     const cat = CATEGORIES[key];
     return `<button data-cat="${key}">
       <span class="icon-circle" style="background:#EEF0F5">${icon(cat.icon,20,'#3D4250')}</span>
       <span class="lbl">${cat.short}</span>
     </button>`;
   }).join('');
-  host.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=> openEntryModal(b.dataset.cat)));
+  const crecheButton = `<button data-action="creche">
+    <span class="icon-circle" style="background:#EEF0F5">${icon('home',20,'#3D4250')}</span>
+    <span class="lbl">Creche</span>
+  </button>`;
+  host.innerHTML = catButtons + crecheButton;
+  host.querySelectorAll('[data-cat]').forEach(b=> b.addEventListener('click', ()=> openEntryModal(b.dataset.cat)));
+  const crecheBtn = host.querySelector('[data-action="creche"]');
+  if(crecheBtn) crecheBtn.addEventListener('click', ()=>{
+    if(settings.crecheLink){
+      window.open(settings.crecheLink, '_blank');
+    } else {
+      showWarning('Adicione o link da creche em Configurações primeiro.');
+      openSettings();
+    }
+  });
 }
 
 // ---------- pending meds (rendered inline inside today's day-card) ----------
@@ -485,10 +500,11 @@ function pendingRowsHtml(activeMeds){
 
   if(!medsExpanded) return header;
 
-  const rows = sorted.map(m=>{
+  const rows = sorted.map((m, idx)=>{
     const given = dosesGivenToday(m).length > 0;
+    const isLast = idx===sorted.length-1;
     const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}`;
-    return `<button class="entry-row" data-med="${m.id}" style="border-bottom:1px solid rgba(0,0,0,.04)">
+    return `<button class="entry-row" data-med="${m.id}" style="${isLast?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)'}">
       <div class="entry-top">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
         <span class="pending-checkbox" style="${given?`background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}`:''}" aria-label="${given?'Dado hoje, toque pra desfazer':'Marcar como dado'}">${given?icon('check',11,'#fff'):''}</span>
@@ -1142,6 +1158,7 @@ function openSettings(){
   let draftSexo = settings.sexo || '';
   let draftBirthdate = settings.birthdate || '';
   let draftSheetLink = settings.sheetLink || '';
+  let draftCrecheLink = settings.crecheLink || '';
 
   function render(){
     host.innerHTML = `<div class="overlay" id="ovSet">
@@ -1163,6 +1180,7 @@ function openSettings(){
           </div>
           <div class="field"><label>Data de nascimento (opcional, pra mostrar a idade)</label>${dtField('birthdateInput','date',draftBirthdate)}</div>
           <div class="field"><label>Link da planilha de exames (Google Sheets)</label><input id="linkInput" value="${esc(draftSheetLink)}" placeholder="https://..."/></div>
+          <div class="field"><label>Link do app da creche</label><input id="crecheLinkInput" value="${esc(draftCrecheLink)}" placeholder="https://..."/></div>
           <div style="display:flex; justify-content:center; gap:16px; padding-top:10px; margin-top:6px; border-top:1px solid #F1EEE6">
             <button type="button" id="exportBtn" style="background:none; border:none; font-size:.7rem; color:var(--ink-muted); cursor:pointer">Exportar dados</button>
             <button type="button" id="importBtn" style="background:none; border:none; font-size:.7rem; color:var(--ink-muted); cursor:pointer">Importar dados</button>
@@ -1176,6 +1194,7 @@ function openSettings(){
     const sexoEl = document.getElementById('sexoInput'); sexoEl.addEventListener('change', e=> draftSexo=e.target.value);
     wireDtField('birthdateInput', v=> draftBirthdate=v);
     const linkEl = document.getElementById('linkInput'); linkEl.addEventListener('input', e=> draftSheetLink=e.target.value);
+    const crecheLinkEl = document.getElementById('crecheLinkInput'); crecheLinkEl.addEventListener('input', e=> draftCrecheLink=e.target.value);
     document.getElementById('exportBtn').addEventListener('click', exportBackup);
     const importFileEl = document.getElementById('importFileInput');
     document.getElementById('importBtn').addEventListener('click', ()=> importFileEl.click());
@@ -1213,6 +1232,7 @@ function openSettings(){
     document.getElementById('saveSet').addEventListener('click', async ()=>{
       saving = true; render();
       settings.sheetLink = draftSheetLink.trim();
+      settings.crecheLink = draftCrecheLink.trim();
       settings.birthdate = draftBirthdate;
       settings.raca = draftRaca.trim();
       settings.sexo = draftSexo;
