@@ -381,6 +381,7 @@ if(!settings.sheetLink){
 }
 let filter = 'todos';
 let medsExpanded = false;
+let expandedMedGroups = new Set();
 let collapsedMonths = new Set(store.get('otto:collapsed-months', []));
 function persistCollapsedMonths(){ writeStore('otto:collapsed-months', [...collapsedMonths]); }
 // Dias colapsados viram quadradinhos; hoje sempre nasce expandido a cada
@@ -503,6 +504,33 @@ function dosesGivenToday(med){
 
 function pendingMedsForToday(){
   return meds.filter(isMedActiveToday);
+}
+
+// Agrupamento de remédios pra dias que não são hoje: mesma linguagem visual do
+// checklist de hoje, mas somente leitura (sem caixinha de marcar/desmarcar,
+// já que é histórico) e recolhido por padrão, com estado próprio por dia.
+function pastMedGroupHtml(dayKey, remedioEntries){
+  if(remedioEntries.length===0) return '';
+  const isOpen = expandedMedGroups.has(dayKey);
+  const header = `<button class="entry-row" data-medgroup-toggle="${esc(dayKey)}" style="${isOpen?'border-bottom:none; padding-bottom:6px':''}">
+    <div class="entry-top">
+      <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>Remédios</span></div>
+      <span style="display:flex; align-items:center; gap:4px; color:var(--ink-muted); font-size:.72rem; font-weight:600">${remedioEntries.length}${icon(isOpen?'chevronUp':'chevronDown',14,'var(--ink-muted)')}</span>
+    </div>
+  </button>`;
+  if(!isOpen) return header;
+  const sorted = remedioEntries.slice().sort((a,b)=> fmtTime(a.date).localeCompare(fmtTime(b.date)));
+  const rows = sorted.map((e, idx)=>{
+    const sub = [fmtTime(e.date), e.note].filter(Boolean).join(' · ');
+    return `<div class="entry-row" style="display:flex; align-items:center; gap:8px; cursor:default; padding:10px 0; ${idx===sorted.length-1?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)'}">
+      <button data-id="${e.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
+        <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(e.title)}</span></div>
+        <div class="entry-sub">${sub}</div>
+      </button>
+      <span class="pending-checkbox" style="background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}; flex-shrink:0">${icon('check',11,'#fff')}</span>
+    </div>`;
+  }).join('');
+  return `${header}<div style="background:${CATEGORIES.remedio.hex}0F; border-radius:12px; padding:0 10px; margin-bottom:8px">${rows}</div>`;
 }
 
 function pendingRowsHtml(activeMeds, adHocEntries){
@@ -682,9 +710,19 @@ function renderTimeline(){
     let squaresHtml = '', cardsHtml = '';
     for(const day of month.days){
       const isToday = day.key===todayKey;
-      const pendingHtml = isToday ? pendingRowsHtml(activeMedsToday, adHocMedEntriesToday) : '';
-      if(day.items.length===0 && !pendingHtml) continue;
       const refDate = day.items[0] ? day.items[0].date : new Date().toISOString();
+
+      let pendingHtml = '';
+      if(isToday){
+        pendingHtml = pendingRowsHtml(activeMedsToday, adHocMedEntriesToday);
+      } else {
+        const dayRemedioEntries = day.items.filter(e=> e.category==='remedio');
+        if(dayRemedioEntries.length>0){
+          day.items = day.items.filter(e=> e.category!=='remedio');
+          pendingHtml = pastMedGroupHtml(day.key, dayRemedioEntries);
+        }
+      }
+      if(day.items.length===0 && !pendingHtml) continue;
       const dayNum = fmtDay(refDate);
       const weekday = fmtWeekdayShort(refDate);
       const isExpanded = expandedDays.has(day.key);
@@ -740,6 +778,11 @@ function renderTimeline(){
   }));
   const medsToggle = document.getElementById('medsSummaryToggle');
   if(medsToggle) medsToggle.addEventListener('click', ()=>{ medsExpanded = !medsExpanded; renderTimeline(); });
+  host.querySelectorAll('[data-medgroup-toggle]').forEach(b=> b.addEventListener('click', ()=>{
+    const key = b.dataset.medgroupToggle;
+    if(expandedMedGroups.has(key)) expandedMedGroups.delete(key); else expandedMedGroups.add(key);
+    renderTimeline();
+  }));
   host.querySelectorAll('[data-month]').forEach(b=> b.addEventListener('click', ()=>{
     const key = b.dataset.month;
     if(collapsedMonths.has(key)) collapsedMonths.delete(key); else collapsedMonths.add(key);
