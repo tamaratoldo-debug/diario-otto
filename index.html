@@ -499,7 +499,7 @@ function dosesGivenToday(med){
   const medId = typeof med==='object' ? med.id : med;
   const medName = typeof med==='object' ? med.name : null;
   return entries.filter(e=> e.category==='remedio' && isSameDay(e.date, t) &&
-    (e.medId===medId || (!e.medId && medName && e.title && e.title.toLowerCase()===medName.toLowerCase())));
+    (e.medId===medId || (!e.medId && medName && e.title && normalizeSearch(e.title)===normalizeSearch(medName))));
 }
 
 function pendingMedsForToday(){
@@ -1032,8 +1032,8 @@ function openEntryModal(category, editId){
   }
 
   function suggestChips(kind, val){
-    const q = (val||'').trim().toLowerCase();
-    const list = chips[kind].filter(c=> !q || (c.toLowerCase().includes(q) && c.toLowerCase()!==q));
+    const q = normalizeSearch(val);
+    const list = chips[kind].filter(c=> !q || (normalizeSearch(c).includes(q) && normalizeSearch(c)!==q));
     return list.map(c=>`<button type="button" class="pick-btn" data-sugg="${kind}" data-val="${esc(c)}">${esc(c)}</button>`).join('');
   }
 
@@ -1483,7 +1483,7 @@ function openFoodManager(onDone){
   function saveFood(){
     const n = draftName.trim();
     if(!n) return;
-    const duplicate = list.some(f=> f.name.toLowerCase()===n.toLowerCase() && f.id!==editingId);
+    const duplicate = list.some(f=> normalizeSearch(f.name)===normalizeSearch(n) && f.id!==editingId);
     if(duplicate){ showWarning(`"${n}" já está cadastrado.`); return; }
     if(editingId){
       list = list.map(f=> f.id===editingId ? { ...f, name:n, receita:draftReceita.trim() } : f);
@@ -1625,7 +1625,7 @@ function openMedManager(onDone, jumpToId){
         return;
       }
 
-      const duplicate = list.some(m=> m.name.toLowerCase()===n.toLowerCase() && (m.horario||'')===(draft.horario||'') && m.id!==editingId);
+      const duplicate = list.some(m=> normalizeSearch(m.name)===normalizeSearch(n) && (m.horario||'')===(draft.horario||'') && m.id!==editingId);
       if(duplicate){
         showWarning(`Já existe "${n}" cadastrado nesse mesmo horário. Edite o existente ou use um horário diferente.`);
         return;
