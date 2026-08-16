@@ -509,9 +509,9 @@ function pendingMedsForToday(){
 // Agrupamento de remédios pra dias que não são hoje: mesma linguagem visual do
 // checklist de hoje, mas somente leitura (sem caixinha de marcar/desmarcar,
 // já que é histórico) e recolhido por padrão, com estado próprio por dia.
-function pastMedGroupHtml(dayKey, remedioEntries){
+function pastMedGroupHtml(dayKey, remedioEntries, forceOpen){
   if(remedioEntries.length===0) return '';
-  const isOpen = expandedMedGroups.has(dayKey);
+  const isOpen = forceOpen || expandedMedGroups.has(dayKey);
   const header = `<button class="entry-row" data-medgroup-toggle="${esc(dayKey)}" style="${isOpen?'border-bottom:none; padding-bottom:6px':''}">
     <div class="entry-top">
       <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>Remédios</span></div>
@@ -638,12 +638,15 @@ function entryRowHtml(e){
   </button>`;
 }
 
+const normalizeSearch = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
 function renderTimeline(){
   let list = entries.slice();
   if(filter!=='todos') list = list.filter(e=>e.category===filter);
-  if(search.trim()){
-    const q = search.trim().toLowerCase();
-    list = list.filter(e => (e.title||'').toLowerCase().includes(q) || (e.note||'').toLowerCase().includes(q) || (e.clinica||'').toLowerCase().includes(q) || (e.quantidade||'').toLowerCase().includes(q));
+  const isSearching = !!search.trim();
+  if(isSearching){
+    const q = normalizeSearch(search);
+    list = list.filter(e => normalizeSearch(e.title).includes(q) || normalizeSearch(e.note).includes(q) || normalizeSearch(e.clinica).includes(q) || normalizeSearch(e.quantidade).includes(q));
   }
   list.sort((a,b)=> new Date(b.date)-new Date(a.date));
 
@@ -719,13 +722,13 @@ function renderTimeline(){
         const dayRemedioEntries = day.items.filter(e=> e.category==='remedio');
         if(dayRemedioEntries.length>0){
           day.items = day.items.filter(e=> e.category!=='remedio');
-          pendingHtml = pastMedGroupHtml(day.key, dayRemedioEntries);
+          pendingHtml = pastMedGroupHtml(day.key, dayRemedioEntries, isSearching);
         }
       }
       if(day.items.length===0 && !pendingHtml) continue;
       const dayNum = fmtDay(refDate);
       const weekday = fmtWeekdayShort(refDate);
-      const isExpanded = expandedDays.has(day.key);
+      const isExpanded = isSearching ? true : expandedDays.has(day.key);
 
       squaresHtml += `<button class="day-square${isExpanded?' active':''}" data-daysquare="${esc(day.key)}">
         <div class="ds-n">${dayNum}</div>
