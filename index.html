@@ -49,21 +49,21 @@
   .pending-checkbox{width:18px; height:18px; border-radius:50%; border:2px solid #7FB89A; flex-shrink:0; display:flex; align-items:center; justify-content:center}
   .rep-overlay{position:fixed; inset:0; background:#fff; z-index:200; overflow-y:auto; -webkit-overflow-scrolling:touch}
   .rep-bar{position:sticky; top:0; z-index:2; background:#fff; border-bottom:1px solid #E5E5E5; padding:calc(10px + env(safe-area-inset-top)) 16px 10px; display:flex; align-items:center; justify-content:space-between}
-  .rep-doc{font-family:Helvetica,Arial,sans-serif; color:#111; padding:18px 18px 40px; max-width:600px; margin:0 auto}
-  .rep-h1{font-size:1.25rem; font-weight:700; margin:0}
-  .rep-sub{font-size:.78rem; color:#5A5A5A; margin:4px 0 0}
-  .rep-hr{border:none; border-top:1.4px solid #111; margin:10px 0 14px}
-  .rep-h2{font-size:.82rem; font-weight:700; text-transform:uppercase; letter-spacing:.02em; margin:20px 0 8px}
+  .rep-doc{font-family:Helvetica,Arial,sans-serif; color:#1E3327; padding:18px 18px 40px; max-width:600px; margin:0 auto}
+  .rep-h1{font-size:1.25rem; font-weight:700; margin:0; color:#1E3327}
+  .rep-sub{font-size:.78rem; color:#5C7568; margin:4px 0 0}
+  .rep-hr{border:none; border-top:1.4px solid #2E4F3B; margin:10px 0 14px}
+  .rep-h2{font-size:.82rem; font-weight:700; text-transform:uppercase; letter-spacing:.02em; margin:20px 0 8px; color:#2E4F3B}
   .rep-table{width:100%; border-collapse:collapse; font-size:.78rem}
-  .rep-table th{text-align:left; font-size:.7rem; color:#5A5A5A; font-weight:600; border-bottom:0.8px solid #D0D0D0; padding:4px 6px 4px 0}
-  .rep-table td{border-bottom:0.6px solid #E2E2E2; padding:4px 6px 4px 0; vertical-align:top}
-  .rep-day{border:0.9px solid #111; margin-bottom:7px; break-inside:avoid; page-break-inside:avoid}
+  .rep-table th{text-align:left; font-size:.7rem; color:#5C7568; font-weight:600; border-bottom:0.8px solid #C7D3CB; padding:4px 6px 4px 0}
+  .rep-table td{border-bottom:0.6px solid #E4E9E5; padding:4px 6px 4px 0; vertical-align:top}
+  .rep-day{border:0.9px solid #2E4F3B; margin-bottom:7px; break-inside:avoid; page-break-inside:avoid}
   .rep-daily-start{break-before:page; page-break-before:always}
-  .rep-day-row{display:flex; border-bottom:0.4px solid #D8D8D8}
+  .rep-day-row{display:flex; border-bottom:0.4px solid #D3DCD6}
   .rep-day-row:last-child{border-bottom:none}
-  .rep-day-label{flex:0 0 82px; font-size:.66rem; font-weight:700; padding:4px 5px; border-right:0.4px solid #D8D8D8}
+  .rep-day-label{flex:0 0 82px; font-size:.66rem; font-weight:700; padding:4px 5px; border-right:0.4px solid #D3DCD6; color:#2E4F3B}
   .rep-day-val{flex:1; font-size:.68rem; padding:4px 5px; line-height:1.25}
-  .rep-small{font-size:.68rem; color:#5A5A5A}
+  .rep-small{font-size:.68rem; color:#5C7568}
   @media print{
     .rep-bar{display:none}
     .rep-overlay{position:static}
@@ -1562,9 +1562,9 @@ function openReport(){
       return {x,y,e};
     });
     const path = pts.map((p,i)=> (i===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
-    const dots = pts.map(p=> `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.6" fill="#111"/><text x="${p.x.toFixed(1)}" y="${(p.y-8).toFixed(1)}" font-size="9" text-anchor="middle" fill="#111">${p.e.value}</text>`).join('');
-    const labels = pts.map((p,i)=> (i===0||i===pts.length-1) ? `<text x="${p.x.toFixed(1)}" y="${H-6}" font-size="8" text-anchor="middle" fill="#5A5A5A">${fmtDateShort(dayKeyOf(p.e.date))}</text>` : '').join('');
-    return `<svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto"><path d="${path}" fill="none" stroke="#111" stroke-width="1.4"/>${dots}${labels}</svg>`;
+    const dots = pts.map(p=> `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.6" fill="#2E4F3B"/><text x="${p.x.toFixed(1)}" y="${(p.y-8).toFixed(1)}" font-size="9" text-anchor="middle" fill="#2E4F3B">${p.e.value}</text>`).join('');
+    const labels = pts.map((p,i)=> (i===0||i===pts.length-1) ? `<text x="${p.x.toFixed(1)}" y="${H-6}" font-size="8" text-anchor="middle" fill="#5C7568">${fmtDateShort(dayKeyOf(p.e.date))}</text>` : '').join('');
+    return `<svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto"><path d="${path}" fill="none" stroke="#2E4F3B" stroke-width="1.4"/>${dots}${labels}</svg>`;
   }
 
   function renderDoc(){
@@ -1609,13 +1609,13 @@ function openReport(){
       if(proc) rows += `<div class="rep-day-row"><div class="rep-day-label">Procedimento</div><div class="rep-day-val">${proc}</div></div>`;
 
       return `<div class="rep-day">
-        <div class="rep-day-row" style="background:#111; color:#fff; border-bottom:none"><div style="padding:4px 6px; font-size:.7rem; font-weight:700">${fmtLongDate(ds)}</div></div>
+        <div class="rep-day-row" style="background:#2E4F3B; color:#fff; border-bottom:none"><div style="padding:4px 6px; font-size:.7rem; font-weight:700">${fmtLongDate(ds)}</div></div>
         ${rows}
       </div>`;
     }).join('');
 
     const nascStr = settings.birthdate ? fmtDateShort(settings.birthdate) + ` (${ageText()})` : '—';
-    const linkHtml = settings.sheetLink ? `<p style="font-size:.82rem; margin:0"><a href="${esc(settings.sheetLink)}" target="_blank" rel="noreferrer" style="color:#111; font-weight:700">Clique para ver o histórico dos exames de sangue</a></p>` : '';
+    const linkHtml = settings.sheetLink ? `<p style="font-size:.82rem; margin:0"><a href="${esc(settings.sheetLink)}" target="_blank" rel="noreferrer" style="color:#2E4F3B; font-weight:700">Clique para ver o histórico dos exames de sangue</a></p>` : '';
 
     host.innerHTML = `<div class="rep-overlay" id="repDocHost">
       <div class="rep-bar">
