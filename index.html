@@ -227,6 +227,7 @@ const ICONS = {
   chevronUp:'<path d="m18 15-6-6-6 6"/>',
   x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
   trash:'<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/>',
+  pencil:'<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497Z"/><path d="m15 5 4 4"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
   paw:'<circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/>',
   camera:'<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="3.5"/>',
@@ -251,7 +252,7 @@ const fmtDateShort = ds=>{ if(!ds) return '?'; const [y,m,d]=ds.split('-'); retu
 const fmtDateDMY = ds=>{ if(!ds) return ''; const [y,m,d]=ds.split('-'); return `${d}/${m}/${y}`; };
 const isSameDay = (iso, ds)=>{ const d=new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`===ds; };
 const toLocalDateStr = (d)=> `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-const isMedActiveToday = med=>{ if(med.tipo==='continuo') return true; const t=todayStr(); if(med.dataInicio && t<med.dataInicio) return false; if(med.dataFim && t>med.dataFim) return false; return true; };
+const isMedActiveToday = med=>{ if(med.tipo==='sob-demanda') return false; if(med.tipo==='continuo') return true; const t=todayStr(); if(med.dataInicio && t<med.dataInicio) return false; if(med.dataFim && t>med.dataFim) return false; return true; };
 const esc = s => (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 // Custom-styled date/time field: the real <input type="date/time"> stays in the DOM but invisible
@@ -351,10 +352,24 @@ function resizeImageFile(file, maxDim=1600, quality=0.85){
 let entries = store.get('otto:entries', []);
 let foods = store.get('otto:foods', []);
 let meds = store.get('otto:meds', []);
+// Migração: remédios antigos tinham 1 horário só (campo "horario"). Agora tem
+// uma lista de horários ("horarios"), e existe um terceiro tipo "sob-demanda"
+// (remédio salvo mas sem horário fixo, tipo "dou se precisar").
+(function migrateMedsToHorarios(){
+  let changed = false;
+  meds = meds.map(m=>{
+    if(m.horarios) return m;
+    changed = true;
+    const horarios = m.horario ? [m.horario] : [];
+    const { horario, ...rest } = m;
+    return { ...rest, horarios };
+  });
+  if(changed) store.set('otto:meds', meds);
+})();
 (function dedupeMeds(){
   const seen = new Set();
   const deduped = meds.filter(m=>{
-    const key = m.name.trim().toLowerCase()+'|'+(m.horario||'');
+    const key = m.name.trim().toLowerCase()+'|'+(m.horarios||[]).join(',');
     if(seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -494,16 +509,29 @@ function renderQuickActions(){
 }
 
 // ---------- pending meds (rendered inline inside today's day-card) ----------
-function dosesGivenToday(med){
+function dosesGivenToday(med, horario){
   const t = todayStr();
   const medId = typeof med==='object' ? med.id : med;
   const medName = typeof med==='object' ? med.name : null;
   return entries.filter(e=> e.category==='remedio' && isSameDay(e.date, t) &&
-    (e.medId===medId || (!e.medId && medName && e.title && normalizeSearch(e.title)===normalizeSearch(medName))));
+    (e.medId===medId || (!e.medId && medName && e.title && normalizeSearch(e.title)===normalizeSearch(medName))) &&
+    (horario===undefined || (e.horarioSlot||'')===horario));
 }
 
-function pendingMedsForToday(){
-  return meds.filter(isMedActiveToday);
+// Cada remédio ativo hoje (contínuo/pontual) vira 1 "slot" por horário
+// cadastrado, já que agora um remédio pode ter vários horários no dia.
+function pendingSlotsForToday(){
+  const active = meds.filter(isMedActiveToday);
+  const slots = [];
+  for(const m of active){
+    const horarios = (m.horarios && m.horarios.length>0) ? m.horarios : [''];
+    for(const h of horarios) slots.push({ med:m, horario:h });
+  }
+  return slots;
+}
+
+function onDemandMeds(){
+  return meds.filter(m=> m.tipo==='sob-demanda');
 }
 
 // Agrupamento de remédios pra dias que não são hoje: mesma linguagem visual do
@@ -533,12 +561,12 @@ function pastMedGroupHtml(dayKey, remedioEntries, forceOpen){
   return `${header}<div style="background:${CATEGORIES.remedio.hex}0F; border-radius:12px; padding:0 10px; margin-bottom:8px">${rows}</div>`;
 }
 
-function pendingRowsHtml(activeMeds, adHocEntries){
+function pendingRowsHtml(activeSlots, adHocEntries){
   adHocEntries = adHocEntries || [];
-  if(activeMeds.length===0 && adHocEntries.length===0) return '';
-  const sortedMeds = activeMeds.slice().sort((a,b)=> (a.horario||'99:99').localeCompare(b.horario||'99:99'));
-  const givenCount = sortedMeds.filter(m=> dosesGivenToday(m).length>0).length + adHocEntries.length;
-  const totalCount = sortedMeds.length + adHocEntries.length;
+  if(activeSlots.length===0 && adHocEntries.length===0) return '';
+  const sortedSlots = activeSlots.slice().sort((a,b)=> (a.horario||'99:99').localeCompare(b.horario||'99:99'));
+  const givenCount = sortedSlots.filter(s=> dosesGivenToday(s.med, s.horario).length>0).length + adHocEntries.length;
+  const totalCount = sortedSlots.length + adHocEntries.length;
 
   const header = `<button class="entry-row" id="medsSummaryToggle" style="${medsExpanded?'border-bottom:none; padding-bottom:6px':''}">
     <div class="entry-top">
@@ -549,17 +577,18 @@ function pendingRowsHtml(activeMeds, adHocEntries){
 
   if(!medsExpanded) return header;
 
-  const medRows = sortedMeds.map(m=>{
-    const given = dosesGivenToday(m).length > 0;
-    const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}`;
+  const medRows = sortedSlots.map(s=>{
+    const m = s.med;
+    const given = dosesGivenToday(m, s.horario).length > 0;
+    const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${s.horario?' · '+s.horario:''}${m.dose?' · '+esc(m.dose):''}`;
     const inner = `<button data-med-edit="${m.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
         <div class="entry-sub">${sub}</div>
       </button>
-      <button data-med="${m.id}" aria-label="${given?'Dado hoje, toque pra desfazer':'Marcar como dado'}" style="background:none; border:none; padding:6px; margin:0 -6px 0 0; cursor:pointer; flex-shrink:0">
+      <button data-med="${m.id}" data-horario="${esc(s.horario)}" aria-label="${given?'Dado hoje, toque pra desfazer':'Marcar como dado'}" style="background:none; border:none; padding:6px; margin:0 -6px 0 0; cursor:pointer; flex-shrink:0">
         <span class="pending-checkbox" style="${given?`background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}`:''}">${given?icon('check',11,'#fff'):''}</span>
       </button>`;
-    return { sortKey: m.horario||'99:99', inner };
+    return { sortKey: s.horario||'99:99', inner };
   });
 
   const adHocRows = adHocEntries.map(e=>{
@@ -578,18 +607,18 @@ function pendingRowsHtml(activeMeds, adHocEntries){
   return `${header}<div style="background:${CATEGORIES.remedio.hex}0F; border-radius:12px; padding:0 10px; margin-bottom:8px">${rows}</div>`;
 }
 
-function toggleMedToday(medId){
+function toggleMedToday(medId, horario){
   const med = meds.find(m=>m.id===medId);
   if(!med) return;
-  const givenToday = dosesGivenToday(med);
+  const givenToday = dosesGivenToday(med, horario);
   if(givenToday.length > 0){
-    // undo: remove today's dose(s) logged for this med
+    // undo: remove today's dose(s) logged para esse remedio+horario
     const idsToRemove = new Set(givenToday.map(e=>e.id));
     entries = entries.filter(e=> !idsToRemove.has(e.id));
   } else {
     let date = new Date();
-    if(med.horario){ const [h,m2] = med.horario.split(':').map(Number); date.setHours(h,m2,0,0); }
-    entries.push({ id:genId(), category:'remedio', medId:med.id, title:med.name, note:med.dose||'', date:date.toISOString(), createdAt:Date.now() });
+    if(horario){ const [h,m2] = horario.split(':').map(Number); date.setHours(h,m2,0,0); }
+    entries.push({ id:genId(), category:'remedio', medId:med.id, horarioSlot:horario||'', title:med.name, note:med.dose||'', date:date.toISOString(), createdAt:Date.now() });
   }
   entries.sort((a,b)=> new Date(b.date)-new Date(a.date));
   persistEntries();
@@ -663,9 +692,9 @@ function renderTimeline(){
 
   // Only show the today's meds checklist when it's meaningful: no filter narrowing to something unrelated, no active search.
   const showPending = (filter==='todos' || filter==='remedio') && !search.trim();
-  const activeMedsToday = showPending ? pendingMedsForToday() : [];
-  const activeMedIdsToday = new Set(activeMedsToday.map(m=>m.id));
-  const activeMedNamesToday = new Set(activeMedsToday.map(m=>m.name.toLowerCase()));
+  const activeSlotsToday = showPending ? pendingSlotsForToday() : [];
+  const activeMedIdsToday = new Set(activeSlotsToday.map(s=>s.med.id));
+  const activeMedNamesToday = new Set(activeSlotsToday.map(s=>s.med.name.toLowerCase()));
   const todayKey = new Date().toDateString();
   const todayMonthKey = fmtMonthYear(new Date().toISOString());
 
@@ -691,7 +720,7 @@ function renderTimeline(){
     }
   }
 
-  if(activeMedsToday.length > 0 || adHocMedEntriesToday.length > 0){
+  if(activeSlotsToday.length > 0 || adHocMedEntriesToday.length > 0){
     let curMonth = months.find(m=> m.key===todayMonthKey);
     if(!curMonth){ curMonth = {key:todayMonthKey, days:[]}; months.unshift(curMonth); }
     let todayDay = curMonth.days.find(d=> d.key===todayKey);
@@ -717,7 +746,7 @@ function renderTimeline(){
 
       let pendingHtml = '';
       if(isToday){
-        pendingHtml = pendingRowsHtml(activeMedsToday, adHocMedEntriesToday);
+        pendingHtml = pendingRowsHtml(activeSlotsToday, adHocMedEntriesToday);
       } else {
         const dayRemedioEntries = day.items.filter(e=> e.category==='remedio');
         if(dayRemedioEntries.length>0){
@@ -750,7 +779,7 @@ function renderTimeline(){
   }
   host.innerHTML = html;
   host.querySelectorAll('[data-id]').forEach(b=> b.addEventListener('click', ()=> openEntryModal(null, b.dataset.id)));
-  host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med)));
+  host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med, b.dataset.horario)));
   host.querySelectorAll('[data-med-edit]').forEach(b=> b.addEventListener('click', ()=> openMedManager(()=> renderAll(), b.dataset.medEdit)));
   host.querySelectorAll('[data-daysquare]').forEach(b=> b.addEventListener('click', ()=>{
     const key = b.dataset.daysquare;
@@ -953,6 +982,7 @@ function openEntryModal(category, editId){
   const cat = CATEGORIES[category];
   const host = document.getElementById('modalHost');
   const quickPick = category==='remedio' && !editing;
+  let medQuickHorarioPick = null;
 
   function canSave(){
     if(category==='peso') return form.value!=='' && !isNaN(parseFloat(form.value));
@@ -973,16 +1003,47 @@ function openEntryModal(category, editId){
       <div class="field"><label>Como ele comeu</label><div class="como-list" id="comoList">${COMO_COMEU.map(([v,l])=>`<button type="button" class="como-btn ${form.comoComeu===v?'sel':''}" style="${form.comoComeu===v?`background:${cat.hex}`:''}" data-v="${v}">${l}</button>`).join('')}</div></div>`;
     }
     if(category==='remedio'){
-      h += `<div class="field"><label>Remédio</label>
-        <div class="pickgrid" id="medPick">${meds.map(m=>{
-          const sub = `${m.horario?m.horario:''}${m.horario&&m.dose?' · ':''}${m.dose?esc(m.dose):''}`;
-          return `<button type="button" class="med-pick-btn ${form.title===m.name?'sel':''}" style="${form.title===m.name?`background:${cat.hex}`:''}" data-id="${m.id}" data-name="${esc(m.name)}" data-dose="${esc(m.dose||'')}" data-horario="${esc(m.horario||'')}">
-            <div class="mp-name">${esc(m.name)}</div>
-            ${sub?`<div class="mp-sub">${sub}</div>`:''}
-          </button>`;
-        }).join('') || '<span class="hint">Nenhum remédio cadastrado ainda.</span>'}</div>
-        <button type="button" class="link-btn" id="openMedMgr" style="color:${cat.hex}; margin-top:8px">+ Gerenciar remédios</button>
-      </div>`;
+      if(quickPick){
+        const scheduled = meds.filter(m=> m.tipo!=='sob-demanda');
+        const onDemand = meds.filter(m=> m.tipo==='sob-demanda');
+        const cardHtml = m=>{
+          const sub = m.tipo==='sob-demanda' ? (m.dose?esc(m.dose):'') : `${(m.horarios||[]).join(', ')}${(m.horarios&&m.horarios.length&&m.dose)?' · ':''}${m.dose?esc(m.dose):''}`;
+          if(medQuickHorarioPick===m.id){
+            return `<div class="med-pick-btn" style="padding:9px 10px; width:100%">
+              <div class="mp-name" style="margin-bottom:6px">${esc(m.name)} — qual horário?</div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap">
+                ${m.horarios.map(h=>`<button type="button" class="pick-btn" data-quickloghorario="${m.id}|${h}" style="background:${cat.hex}22">${h}</button>`).join('')}
+                <button type="button" class="pick-btn" data-quickcancel="1">Cancelar</button>
+              </div>
+            </div>`;
+          }
+          return `<div class="med-pick-btn" style="display:flex; align-items:stretch; gap:0; padding:0 2px 0 12px">
+            <button type="button" data-quicklog="${m.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:9px 6px 9px 0; font-family:inherit; cursor:pointer; color:inherit">
+              <div class="mp-name">${esc(m.name)}</div>
+              ${sub?`<div class="mp-sub">${sub}</div>`:''}
+            </button>
+            <button type="button" data-quickedit="${m.id}" style="background:none; border:none; padding:8px; color:var(--ink-muted); cursor:pointer; flex-shrink:0">${icon('pencil',14,'var(--ink-muted)')}</button>
+          </div>`;
+        };
+        h += `<div class="field">
+          <button type="button" class="add-trigger" id="openMedMgr" style="margin-bottom:14px">${icon('plus',15)} Cadastrar remédio</button>
+          ${scheduled.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Horário fixo</label><div class="pickgrid" id="medPickScheduled" style="justify-content:flex-start; margin-bottom:16px">${scheduled.map(cardHtml).join('')}</div>` : ''}
+          ${onDemand.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Sob demanda</label><div class="pickgrid" id="medPickOnDemand" style="justify-content:flex-start">${onDemand.map(cardHtml).join('')}</div>` : ''}
+          ${meds.length===0? '<span class="hint">Nenhum remédio cadastrado ainda.</span>' : ''}
+        </div>`;
+      } else {
+        h += `<div class="field"><label>Remédio</label>
+          <div class="pickgrid" id="medPick">${meds.map(m=>{
+            const horario = (m.horarios&&m.horarios[0])||'';
+            const sub = `${horario}${horario&&m.dose?' · ':''}${m.dose?esc(m.dose):''}`;
+            return `<button type="button" class="med-pick-btn ${form.title===m.name?'sel':''}" style="${form.title===m.name?`background:${cat.hex}`:''}" data-id="${m.id}" data-name="${esc(m.name)}" data-dose="${esc(m.dose||'')}" data-horario="${esc(horario)}">
+              <div class="mp-name">${esc(m.name)}</div>
+              ${sub?`<div class="mp-sub">${sub}</div>`:''}
+            </button>`;
+          }).join('') || '<span class="hint">Nenhum remédio cadastrado ainda.</span>'}</div>
+          <button type="button" class="link-btn" id="openMedMgr" style="color:${cat.hex}; margin-top:8px">+ Gerenciar remédios</button>
+        </div>`;
+      }
     }
     if(category==='peso'){
       h += `<div class="field"><label>Peso (kg)</label><input id="f_value" type="number" step="0.1" value="${esc(String(form.value))}" placeholder="ex: 8.4"/></div>`;
@@ -1083,12 +1144,31 @@ function openEntryModal(category, editId){
       if(!editing && b.dataset.horario) form.dateT=b.dataset.horario;
       refreshBody();
     }));
-    if(medPick && quickPick) medPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
-      const id = b.dataset.id;
-      closeModal();
-      openMedManager(null, id);
-    }));
-    const openMM = document.getElementById('openMedMgr'); if(openMM) openMM.addEventListener('click', ()=> openMedManager(()=>{ refreshBody(); }));
+    if(quickPick){
+      document.querySelectorAll('[data-quicklog]').forEach(b=> b.addEventListener('click', ()=>{
+        const m = meds.find(x=>x.id===b.dataset.quicklog);
+        if(!m) return;
+        if(m.tipo==='sob-demanda' || !m.horarios || m.horarios.length<=1){
+          toggleMedToday(m.id, (m.horarios&&m.horarios[0]) || '');
+          closeModal();
+        } else {
+          medQuickHorarioPick = m.id;
+          refreshBody();
+        }
+      }));
+      document.querySelectorAll('[data-quickloghorario]').forEach(b=> b.addEventListener('click', ()=>{
+        const [medId, horario] = b.dataset.quickloghorario.split('|');
+        toggleMedToday(medId, horario);
+        closeModal();
+      }));
+      document.querySelectorAll('[data-quickcancel]').forEach(b=> b.addEventListener('click', ()=>{ medQuickHorarioPick=null; refreshBody(); }));
+      document.querySelectorAll('[data-quickedit]').forEach(b=> b.addEventListener('click', ()=>{
+        const id = b.dataset.quickedit;
+        closeModal();
+        openMedManager(null, id);
+      }));
+    }
+    const openMM = document.getElementById('openMedMgr'); if(openMM) openMM.addEventListener('click', ()=> quickPick ? openMedManager(()=>{ refreshBody(); }, null, true) : openMedManager(()=>{ refreshBody(); }));
 
     const comoList = document.getElementById('comoList');
     if(comoList) comoList.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.comoComeu = form.comoComeu===b.dataset.v ? '' : b.dataset.v; refreshBody(); }));
@@ -1186,7 +1266,31 @@ function openEntryModal(category, editId){
     const foodPick = document.getElementById('foodPick'); if(foodPick) foodPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.title=b.dataset.name; refreshBody(); }));
     const openFM = document.getElementById('openFoodMgr'); if(openFM) openFM.addEventListener('click', ()=> openFoodManager(()=>{ refreshBody(); }));
     const medPick = document.getElementById('medPick'); if(medPick) medPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.title=b.dataset.name; if(!form.note && b.dataset.dose) form.note=b.dataset.dose; if(!editing && b.dataset.horario) form.dateT=b.dataset.horario; refreshBody(); }));
-    const openMM = document.getElementById('openMedMgr'); if(openMM) openMM.addEventListener('click', ()=> openMedManager(()=>{ refreshBody(); }));
+    if(quickPick){
+      document.querySelectorAll('[data-quicklog]').forEach(b=> b.addEventListener('click', ()=>{
+        const m = meds.find(x=>x.id===b.dataset.quicklog);
+        if(!m) return;
+        if(m.tipo==='sob-demanda' || !m.horarios || m.horarios.length<=1){
+          toggleMedToday(m.id, (m.horarios&&m.horarios[0]) || '');
+          closeModal();
+        } else {
+          medQuickHorarioPick = m.id;
+          refreshBody();
+        }
+      }));
+      document.querySelectorAll('[data-quickloghorario]').forEach(b=> b.addEventListener('click', ()=>{
+        const [medId, horario] = b.dataset.quickloghorario.split('|');
+        toggleMedToday(medId, horario);
+        closeModal();
+      }));
+      document.querySelectorAll('[data-quickcancel]').forEach(b=> b.addEventListener('click', ()=>{ medQuickHorarioPick=null; refreshBody(); }));
+      document.querySelectorAll('[data-quickedit]').forEach(b=> b.addEventListener('click', ()=>{
+        const id = b.dataset.quickedit;
+        closeModal();
+        openMedManager(null, id);
+      }));
+    }
+    const openMM = document.getElementById('openMedMgr'); if(openMM) openMM.addEventListener('click', ()=> quickPick ? openMedManager(()=>{ refreshBody(); }, null, true) : openMedManager(()=>{ refreshBody(); }));
     const comoList = document.getElementById('comoList'); if(comoList) comoList.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.comoComeu = form.comoComeu===b.dataset.v ? '' : b.dataset.v; refreshBody(); }));
     document.querySelectorAll('[data-g]').forEach(b=> b.addEventListener('click', ()=>{ form.gravidade = form.gravidade===b.dataset.g ? '' : b.dataset.g; refreshBody(); }));
     wirePhoto();
@@ -1503,12 +1607,12 @@ function openFoodManager(onDone){
 }
 
 // ================= MED MANAGER =================
-function openMedManager(onDone, jumpToId){
+function openMedManager(onDone, jumpToId, startAdding){
   const host = document.getElementById('modalHost');
   let list = meds.slice();
   let adding = false;
   let editingId = null;
-  let draft = {name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horario:''};
+  let draft = {name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[]};
   let submitting = false;
 
   if(jumpToId){
@@ -1516,18 +1620,33 @@ function openMedManager(onDone, jumpToId){
     if(m){
       editingId = m.id;
       adding = true;
-      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horario:m.horario||'' };
+      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).slice() };
     }
+  } else if(startAdding){
+    adding = true;
+  }
+
+  function medSubLabel(m){
+    if(m.tipo==='sob-demanda') return 'Sob demanda' + (m.dose?' · '+esc(m.dose):'');
+    const horarios = (m.horarios&&m.horarios.length) ? m.horarios.join(', ') : '';
+    return `${m.tipo==='continuo'?'Contínuo':`Pontual · ${fmtDateShort(m.dataInicio)} a ${fmtDateShort(m.dataFim)}`}${horarios?' · '+horarios:''}${m.dose?' · '+esc(m.dose):''}`;
   }
 
   function render(){
     submitting = false;
+    const scheduled = list.filter(m=> m.tipo!=='sob-demanda');
+    const onDemand = list.filter(m=> m.tipo==='sob-demanda');
+    const itemHtml = m=> `<div class="manager-item" data-open="${m.id}" style="cursor:pointer"><div><div class="name">${esc(m.name)}</div><div class="sub">${medSubLabel(m)}</div></div><button class="del-btn" data-id="${m.id}">${icon('trash',14,'var(--ink-muted)')}</button></div>`;
     host.innerHTML = `<div class="overlay" id="ovMed">
       <div class="sheet" style="max-height:90vh">
         <div class="sheet-head"><div class="sheet-title">Remédios atuais</div><button class="icon-btn" id="closeMed">${icon('x',18)}</button></div>
         <div class="sheet-body">
           <div id="addArea"></div>
-          <div id="medList" style="${adding?'display:none':''}">${list.map(m=>`<div class="manager-item" data-open="${m.id}" style="cursor:pointer"><div><div class="name">${esc(m.name)}</div><div class="sub">${m.tipo==='continuo'?'Contínuo':`Pontual · ${fmtDateShort(m.dataInicio)} a ${fmtDateShort(m.dataFim)}`}${m.horario?' · '+m.horario:''}${m.dose?' · '+esc(m.dose):''}</div></div><button class="del-btn" data-id="${m.id}">${icon('trash',14,'var(--ink-muted)')}</button></div>`).join('') || (adding?'':'<div class="hint" style="text-align:center; padding:16px 0">Nada cadastrado ainda.</div>')}</div>
+          <div id="medList" style="${adding?'display:none':''}">
+            ${scheduled.length? `<div class="hint" style="font-weight:600; margin:10px 0 6px">Horário fixo</div>${scheduled.map(itemHtml).join('')}` : ''}
+            ${onDemand.length? `<div class="hint" style="font-weight:600; margin:14px 0 6px">Sob demanda</div>${onDemand.map(itemHtml).join('')}` : ''}
+            ${list.length===0 && !adding? '<div class="hint" style="text-align:center; padding:16px 0">Nada cadastrado ainda.</div>' : ''}
+          </div>
         </div>
         <div class="sheet-foot"><button class="btn-primary" id="doneMedBtn">Pronto</button></div>
       </div>
@@ -1541,12 +1660,12 @@ function openMedManager(onDone, jumpToId){
       if(editingId===b.dataset.id){ adding=false; editingId=null; }
       render();
     }));
-    document.querySelectorAll('#medList .manager-item').forEach((row, idx)=> row.addEventListener('click', ()=>{
-      const m = list[idx];
+    document.querySelectorAll('#medList .manager-item').forEach(row=> row.addEventListener('click', ()=>{
+      const m = list.find(x=>x.id===row.dataset.open);
       if(!m) return;
       editingId = m.id;
       adding = true;
-      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horario:m.horario||'' };
+      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).slice() };
       syncMedListVisibility();
       renderAddArea();
       document.getElementById('addArea').scrollIntoView({behavior:'smooth', block:'center'});
@@ -1563,29 +1682,37 @@ function openMedManager(onDone, jumpToId){
     const area = document.getElementById('addArea');
     if(!adding){
       area.innerHTML = `<button class="add-trigger" id="startAdd" style="margin-bottom:14px">${icon('plus',15)} Cadastrar remédio</button>`;
-      document.getElementById('startAdd').addEventListener('click', ()=>{ adding=true; editingId=null; draft={name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horario:''}; syncMedListVisibility(); renderAddArea(); });
+      document.getElementById('startAdd').addEventListener('click', ()=>{ adding=true; editingId=null; draft={name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[]}; syncMedListVisibility(); renderAddArea(); });
       return;
     }
+    const isScheduled = draft.tipo==='continuo' || draft.tipo==='pontual';
     area.innerHTML = `<div class="add-form">
       ${editingId? `<div class="hint" style="margin-bottom:8px; font-weight:600; color:${CATEGORIES.remedio.hex}">Editando</div>` : ''}
       <div class="field"><label>Nome do remédio</label><input id="d_name" autocomplete="off" value="${esc(draft.name)}" placeholder="ex: Omeprazol"/></div>
       <div class="field"><label>Tipo</label><div class="tipo-toggle">
         <button data-tipo="continuo" class="${draft.tipo==='continuo'?'sel':''}">Contínuo</button>
         <button data-tipo="pontual" class="${draft.tipo==='pontual'?'sel':''}">Pontual (início e fim)</button>
-        <button data-tipo="unica" class="${draft.tipo==='unica'?'sel':''}">Dose única</button>
+        <button data-tipo="sob-demanda" class="${draft.tipo==='sob-demanda'?'sel':''}">Sob demanda</button>
       </div></div>
       ${draft.tipo==='pontual'? `
         <div class="field"><label>Início</label>${dtField('d_inicio','date',draft.dataInicio)}</div>
         <div class="field"><label>Fim</label>${dtField('d_fim','date',draft.dataFim)}</div>
       ` : ''}
-      ${draft.tipo==='unica'? `<div class="hint" style="margin-bottom:4px">Registra a dose agora mesmo, na hora. Não fica cadastrado pra aparecer de novo depois.</div>` : ''}
+      ${draft.tipo==='sob-demanda'? `<div class="hint" style="margin-bottom:4px">Fica salvo, sem horário fixo, pra você tocar e registrar só quando precisar (não entra no checklist de hoje).</div>` : ''}
       <div class="field"><label>Dose / instruções (opcional)</label><input id="d_dose" autocomplete="off" value="${esc(draft.dose)}" placeholder="ex: 1 comprimido"/></div>
-      <div class="field"><label>${draft.tipo==='unica'?'Horário da dose':'Horário programado (opcional)'}</label>${dtField('d_horario','time',draft.horario)}
-      </div>
+      ${isScheduled? `<div class="field"><label>Horários</label>
+        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px">
+          ${draft.horarios.map((h,i)=>`<span style="display:inline-flex; align-items:center; gap:5px; background:${CATEGORIES.remedio.hex}18; color:${CATEGORIES.remedio.hex}; border-radius:8px; padding:5px 6px 5px 10px; font-size:.82rem; font-weight:600">${h}<button type="button" data-rm-horario="${i}" style="background:none; border:none; padding:2px; display:flex; color:inherit">${icon('x',12,CATEGORIES.remedio.hex)}</button></span>`).join('') || '<span class="hint">Nenhum horário adicionado ainda.</span>'}
+        </div>
+        <div style="display:flex; gap:8px">
+          <div style="flex:1">${dtField('d_horario_new','time','')}</div>
+          <button type="button" class="btn-secondary" id="addHorarioBtn">Adicionar</button>
+        </div>
+      </div>` : ''}
       <div style="display:flex; gap:8px; margin-top:4px">
         ${editingId? `<button class="btn-secondary" id="deleteMedBtn" style="color:#B3261E; padding:0 14px">${icon('trash',16,'#B3261E')}</button>` : ''}
         <button class="btn-secondary" id="cancelAdd" style="flex:1">Cancelar</button>
-        <button class="btn-primary" id="confirmAdd" ${draft.name.trim()?'':'disabled'}>${draft.tipo==='unica'?'Registrar':(editingId?'Salvar':'Adicionar')}</button>
+        <button class="btn-primary" id="confirmAdd" ${draft.name.trim()?'':'disabled'}>${editingId?'Salvar':'Adicionar'}</button>
       </div>
     </div>`;
     document.getElementById('d_name').addEventListener('input', e=>{ draft.name=e.target.value; document.getElementById('confirmAdd').disabled = !draft.name.trim(); });
@@ -1596,42 +1723,42 @@ function openMedManager(onDone, jumpToId){
       adding=false; editingId=null;
       render();
     });
-    document.querySelectorAll('[data-tipo]').forEach(b=> b.addEventListener('click', ()=>{
-      draft.tipo=b.dataset.tipo;
-      if(draft.tipo==='unica' && !draft.horario){
-        const now = new Date();
-        draft.horario = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-      }
-      renderAddArea();
-    }));
+    document.querySelectorAll('[data-tipo]').forEach(b=> b.addEventListener('click', ()=>{ draft.tipo=b.dataset.tipo; renderAddArea(); }));
     wireDtField('d_inicio', v=> draft.dataInicio=v);
     wireDtField('d_fim', v=> draft.dataFim=v);
     document.getElementById('d_dose').addEventListener('input', e=> draft.dose=e.target.value);
-    wireDtField('d_horario', v=> draft.horario=v);
+    if(isScheduled){
+      let newHorarioVal = '';
+      wireDtField('d_horario_new', v=> newHorarioVal=v);
+      document.getElementById('addHorarioBtn').addEventListener('click', ()=>{
+        if(!newHorarioVal) return;
+        if(!draft.horarios.includes(newHorarioVal)) draft.horarios.push(newHorarioVal);
+        draft.horarios.sort();
+        renderAddArea();
+      });
+      document.querySelectorAll('[data-rm-horario]').forEach(b=> b.addEventListener('click', ()=>{
+        draft.horarios.splice(Number(b.dataset.rmHorario),1);
+        renderAddArea();
+      }));
+    }
     document.getElementById('cancelAdd').addEventListener('click', ()=>{ adding=false; editingId=null; syncMedListVisibility(); renderAddArea(); });
     document.getElementById('confirmAdd').addEventListener('click', ()=>{
       if(submitting) return;
       const n = draft.name.trim(); if(!n) return;
 
-      if(draft.tipo==='unica'){
-        submitting = true;
-        let date = new Date();
-        if(draft.horario){ const [h,m2] = draft.horario.split(':').map(Number); date.setHours(h,m2,0,0); }
-        entries.push({ id:genId(), category:'remedio', medId:null, title:n, note:draft.dose.trim(), date:date.toISOString(), createdAt:Date.now() });
-        entries.sort((a,b)=> new Date(b.date)-new Date(a.date));
-        persistEntries();
-        closeModal();
-        renderAll();
-        return;
-      }
-
-      const duplicate = list.some(m=> normalizeSearch(m.name)===normalizeSearch(n) && (m.horario||'')===(draft.horario||'') && m.id!==editingId);
+      const duplicate = list.some(m=> normalizeSearch(m.name)===normalizeSearch(n) && m.id!==editingId);
       if(duplicate){
-        showWarning(`Já existe "${n}" cadastrado nesse mesmo horário. Edite o existente ou use um horário diferente.`);
+        showWarning(`Já existe "${n}" cadastrado. Edite ele pra ajustar os horários, em vez de criar de novo.`);
         return;
       }
       submitting = true;
-      const payload = { name:n, tipo:draft.tipo, dataInicio: draft.tipo==='pontual'?draft.dataInicio:'', dataFim: draft.tipo==='pontual'?draft.dataFim:'', dose:draft.dose.trim(), horario:draft.horario };
+      const payload = {
+        name:n, tipo:draft.tipo,
+        dataInicio: draft.tipo==='pontual'?draft.dataInicio:'',
+        dataFim: draft.tipo==='pontual'?draft.dataFim:'',
+        dose:draft.dose.trim(),
+        horarios: (draft.tipo==='continuo'||draft.tipo==='pontual') ? draft.horarios.slice() : []
+      };
       if(editingId){
         list = list.map(m=> m.id===editingId ? { ...m, ...payload } : m);
       } else {
