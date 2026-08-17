@@ -744,8 +744,8 @@ function renderTimeline(){
   // Only show the today's meds checklist when it's meaningful: no filter narrowing to something unrelated, no active search.
   const showPending = (filter==='todos' || filter==='remedio') && !search.trim();
   const activeSlotsToday = showPending ? pendingSlotsForToday() : [];
-  const activeMedIdsToday = new Set(activeSlotsToday.map(s=>s.med.id));
   const activeMedNamesToday = new Set(activeSlotsToday.map(s=>s.med.name.toLowerCase()));
+  const activeSlotKeys = new Set(activeSlotsToday.map(s=> s.med.id+'|'+(s.horario||'')));
   const todayKey = new Date().toDateString();
   const todayMonthKey = fmtMonthYear(new Date().toISOString());
 
@@ -753,8 +753,11 @@ function renderTimeline(){
   if(showPending){
     // Registry-linked remedio doses logged today are already represented (checked) in the
     // stable checklist above — remove them here so they don't also show a second time below.
-    // Doses avulsas (medId null, tipo "Dose única") também são puxadas pro checklist em vez
-    // de aparecerem soltas na lista principal do dia.
+    // Doses avulsas (sob demanda / medId sem correspondência) também são puxadas pro checklist
+    // em vez de aparecerem soltas na lista principal do dia.
+    // Importante: o "match" precisa ser por remédio+horário, não só remédio — senão, se você
+    // editar o horário de um remédio depois de já ter dado a dose de hoje, esse registro antigo
+    // fica preso (não bate mais com nenhum horário atual) e simplesmente some da tela.
     const todayDate = todayStr();
     for(const month of months){
       if(month.key!==todayMonthKey) continue;
@@ -762,7 +765,7 @@ function renderTimeline(){
         if(day.key!==todayKey) continue;
         day.items = day.items.filter(e=> {
           if(e.category!=='remedio' || !isSameDay(e.date, todayDate)) return true;
-          const matches = e.medId ? activeMedIdsToday.has(e.medId) : (e.title && activeMedNamesToday.has(e.title.toLowerCase()));
+          const matches = e.medId ? activeSlotKeys.has(e.medId+'|'+(e.horarioSlot||'')) : (e.title && activeMedNamesToday.has(e.title.toLowerCase()));
           if(matches) return false;
           adHocMedEntriesToday.push(e);
           return false;
@@ -1058,7 +1061,12 @@ function openEntryModal(category, editId){
         const scheduled = meds.filter(m=> m.tipo!=='sob-demanda');
         const onDemand = meds.filter(m=> m.tipo==='sob-demanda');
         const cardHtml = m=>{
-          const sub = m.tipo==='sob-demanda' ? (m.dose?esc(m.dose):'') : `${(m.horarios||[]).join(', ')}${(m.horarios&&m.horarios.length&&m.dose)?' · ':''}${m.dose?esc(m.dose):''}`;
+          let sub = m.tipo==='sob-demanda' ? (m.dose?esc(m.dose):'') : `${(m.horarios||[]).join(', ')}${(m.horarios&&m.horarios.length&&m.dose)?' · ':''}${m.dose?esc(m.dose):''}`;
+          let givenBadge = '';
+          if(m.tipo==='sob-demanda'){
+            const given = dosesGivenToday(m, '');
+            if(given.length>0) givenBadge = `<div class="mp-sub" style="color:${CATEGORIES.remedio.hex}; font-weight:600">Já dado hoje às ${fmtTime(given[given.length-1].date)}</div>`;
+          }
           if(medQuickHorarioPick===m.id){
             return `<div class="med-pick-btn" style="padding:9px 10px; width:100%">
               <div class="mp-name" style="margin-bottom:6px">${esc(m.name)} — qual horário?</div>
@@ -1072,6 +1080,7 @@ function openEntryModal(category, editId){
             <button type="button" data-quicklog="${m.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:9px 6px 9px 0; font-family:inherit; cursor:pointer; color:inherit">
               <div class="mp-name">${esc(m.name)}</div>
               ${sub?`<div class="mp-sub">${sub}</div>`:''}
+              ${givenBadge}
             </button>
             <button type="button" data-quickedit="${m.id}" style="background:none; border:none; padding:8px; color:var(--ink-muted); cursor:pointer; flex-shrink:0">${icon('pencil',14,'var(--ink-muted)')}</button>
           </div>`;
