@@ -649,21 +649,11 @@ function pendingRowsHtml(activeSlots, adHocEntries){
         <div class="entry-sub">${sub}</div>
       </button>
       <span class="pending-checkbox" style="background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}; flex-shrink:0">${icon('check',11,'#fff')}</span>`;
-    return { sortKey: fmtTime(e.date), inner, adHocId: e.id };
+    return { sortKey: fmtTime(e.date), inner };
   });
 
   const allRows = [...medRows, ...adHocRows].sort((a,b)=> a.sortKey.localeCompare(b.sortKey));
-  const rows = allRows.map((row, idx)=>{
-    const borderStyle = idx===allRows.length-1?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)';
-    if(row.adHocId){
-      // Doses avulsas (sob demanda / já registradas) não têm caixinha de marcar
-      // de verdade — pra desfazer, um ícone de excluir fixo do lado.
-      return `<div class="entry-row" style="display:flex; align-items:center; gap:6px; cursor:default; padding:10px 0; ${borderStyle}">${row.inner}
-        <button data-del-adhoc="${row.adHocId}" aria-label="Excluir" style="background:none; border:none; padding:6px; margin:0 -6px 0 -2px; color:var(--ink-muted); cursor:pointer; flex-shrink:0">${icon('trash',14,'var(--ink-muted)')}</button>
-      </div>`;
-    }
-    return `<div class="entry-row" style="display:flex; align-items:center; gap:8px; cursor:default; padding:10px 0; ${borderStyle}">${row.inner}</div>`;
-  }).join('');
+  const rows = allRows.map((row, idx)=> `<div class="entry-row" style="display:flex; align-items:center; gap:8px; cursor:default; padding:10px 0; ${idx===allRows.length-1?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)'}">${row.inner}</div>`).join('');
 
   return `${header}<div style="background:${CATEGORIES.remedio.hex}0F; border-radius:12px; padding:0 10px; margin-bottom:8px">${rows}</div>`;
 }
@@ -840,13 +830,6 @@ function renderTimeline(){
   }
   host.innerHTML = html;
   host.querySelectorAll('[data-id]').forEach(b=> b.addEventListener('click', ()=> openEntryModal(null, b.dataset.id)));
-  host.querySelectorAll('[data-del-adhoc]').forEach(b=> b.addEventListener('click', (ev)=>{
-    ev.stopPropagation();
-    const id = b.dataset.delAdhoc;
-    entries = entries.filter(e=> e.id!==id);
-    persistEntries();
-    renderAll();
-  }));
   host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med, b.dataset.horario)));
   host.querySelectorAll('[data-med-edit]').forEach(b=> b.addEventListener('click', ()=> openMedManager(()=> renderAll(), b.dataset.medEdit)));
   host.querySelectorAll('[data-daysquare]').forEach(b=> b.addEventListener('click', ()=>{
