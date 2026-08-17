@@ -55,14 +55,14 @@
   .rep-hr{border:none; border-top:1.4px solid #111; margin:10px 0 14px}
   .rep-h2{font-size:.82rem; font-weight:700; text-transform:uppercase; letter-spacing:.02em; margin:20px 0 8px}
   .rep-table{width:100%; border-collapse:collapse; font-size:.78rem}
-  .rep-table th{text-align:left; font-size:.72rem; border-bottom:1.4px solid #111; padding:5px 6px 5px 0}
-  .rep-table td{border-bottom:0.6px solid #B8B8B8; padding:5px 6px 5px 0; vertical-align:top}
-  .rep-day{border:0.9px solid #111; margin-bottom:10px; break-inside:avoid; page-break-inside:avoid}
+  .rep-table th{text-align:left; font-size:.7rem; color:#5A5A5A; font-weight:600; border-bottom:0.8px solid #D0D0D0; padding:4px 6px 4px 0}
+  .rep-table td{border-bottom:0.6px solid #E2E2E2; padding:4px 6px 4px 0; vertical-align:top}
+  .rep-day{border:0.9px solid #111; margin-bottom:7px; break-inside:avoid; page-break-inside:avoid}
   .rep-daily-start{break-before:page; page-break-before:always}
-  .rep-day-row{display:flex; border-bottom:0.4px solid #B8B8B8}
+  .rep-day-row{display:flex; border-bottom:0.4px solid #D8D8D8}
   .rep-day-row:last-child{border-bottom:none}
-  .rep-day-label{flex:0 0 96px; font-size:.72rem; font-weight:700; padding:6px 6px; border-right:0.4px solid #B8B8B8}
-  .rep-day-val{flex:1; font-size:.76rem; padding:6px 6px; line-height:1.4}
+  .rep-day-label{flex:0 0 82px; font-size:.66rem; font-weight:700; padding:4px 5px; border-right:0.4px solid #D8D8D8}
+  .rep-day-val{flex:1; font-size:.68rem; padding:4px 5px; line-height:1.25}
   .rep-small{font-size:.68rem; color:#5A5A5A}
   @media print{
     .rep-bar{display:none}
@@ -1583,7 +1583,14 @@ function openReport(){
       const dayEntries = inRange.filter(e=> dayKeyOf(e.date)===ds);
       if(dayEntries.length===0) return '';
       const remedios = [...new Set(dayEntries.filter(e=>e.category==='remedio').map(e=>e.title))];
-      const naoAdmin = continuos.map(m=>m.name).filter(n=> !remedios.some(r=> normalizeSearch(r)===normalizeSearch(n)));
+      const givenSlots = new Set(dayEntries.filter(e=>e.category==='remedio' && e.medId).map(e=> e.medId+'|'+(e.horarioSlot||'')));
+      const naoAdmin = [];
+      continuos.forEach(m=>{
+        const horarios = (m.horarios&&m.horarios.length) ? m.horarios : [''];
+        horarios.forEach(h=>{
+          if(!givenSlots.has(m.id+'|'+h)) naoAdmin.push(h ? `${m.name} (${h})` : m.name);
+        });
+      });
       const alimentacao = dayEntries.filter(e=>e.category==='alimentacao')
         .map(e=> `${esc(e.title)}${entrySubtitle(e)?` (${esc(entrySubtitle(e))})`:''} — ${fmtTime(e.date)}`).join('; ');
       const interc = dayEntries.filter(e=>e.category==='intercorrencia')
@@ -1602,13 +1609,13 @@ function openReport(){
       if(proc) rows += `<div class="rep-day-row"><div class="rep-day-label">Procedimento</div><div class="rep-day-val">${proc}</div></div>`;
 
       return `<div class="rep-day">
-        <div class="rep-day-row" style="background:#111; color:#fff; border-bottom:none"><div style="padding:6px 8px; font-size:.76rem; font-weight:700">${fmtLongDate(ds)}</div></div>
+        <div class="rep-day-row" style="background:#111; color:#fff; border-bottom:none"><div style="padding:4px 6px; font-size:.7rem; font-weight:700">${fmtLongDate(ds)}</div></div>
         ${rows}
       </div>`;
     }).join('');
 
     const nascStr = settings.birthdate ? fmtDateShort(settings.birthdate) + ` (${ageText()})` : '—';
-    const linkHtml = settings.sheetLink ? `<p style="font-size:.82rem; margin-top:10px"><a href="${esc(settings.sheetLink)}" target="_blank" rel="noreferrer" style="color:#111; font-weight:700">Clique para ver o histórico dos exames de sangue</a></p>` : '';
+    const linkHtml = settings.sheetLink ? `<p style="font-size:.82rem; margin:0"><a href="${esc(settings.sheetLink)}" target="_blank" rel="noreferrer" style="color:#111; font-weight:700">Clique para ver o histórico dos exames de sangue</a></p>` : '';
 
     host.innerHTML = `<div class="rep-overlay" id="repDocHost">
       <div class="rep-bar">
@@ -1623,7 +1630,8 @@ function openReport(){
         ${weightSectionHtml(pesoEntries)}
         <div class="rep-h2">Medicações utilizadas</div>
         <table class="rep-table"><tr><th>Medicação</th><th>Horários</th><th>Posologia</th><th>Duração</th></tr>${medRows || '<tr><td colspan="4">Nenhuma cadastrada</td></tr>'}</table>
-        ${linkHtml}
+        <div class="rep-h2">Exames</div>
+        ${linkHtml || '<p class="rep-small">Nenhum link cadastrado.</p>'}
         <div class="rep-h2 rep-daily-start">Registro diário</div>
         ${dayBlocks || '<p class="rep-small">Nenhum registro no período.</p>'}
       </div>
