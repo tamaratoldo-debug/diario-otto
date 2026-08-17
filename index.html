@@ -47,6 +47,26 @@
   .section-title{font-size:.9rem; font-weight:600}
 
   .pending-checkbox{width:18px; height:18px; border-radius:50%; border:2px solid #7FB89A; flex-shrink:0; display:flex; align-items:center; justify-content:center}
+  .rep-overlay{position:fixed; inset:0; background:#fff; z-index:200; overflow-y:auto; -webkit-overflow-scrolling:touch}
+  .rep-bar{position:sticky; top:0; z-index:2; background:#fff; border-bottom:1px solid #E5E5E5; padding:calc(10px + env(safe-area-inset-top)) 16px 10px; display:flex; align-items:center; justify-content:space-between}
+  .rep-doc{font-family:Helvetica,Arial,sans-serif; color:#111; padding:18px 18px 40px; max-width:600px; margin:0 auto}
+  .rep-h1{font-size:1.25rem; font-weight:700; margin:0}
+  .rep-sub{font-size:.78rem; color:#5A5A5A; margin:4px 0 0}
+  .rep-hr{border:none; border-top:1.4px solid #111; margin:10px 0 14px}
+  .rep-h2{font-size:.82rem; font-weight:700; text-transform:uppercase; letter-spacing:.02em; margin:20px 0 8px}
+  .rep-table{width:100%; border-collapse:collapse; font-size:.78rem}
+  .rep-table th{text-align:left; font-size:.72rem; border-bottom:1.4px solid #111; padding:5px 6px 5px 0}
+  .rep-table td{border-bottom:0.6px solid #B8B8B8; padding:5px 6px 5px 0; vertical-align:top}
+  .rep-day{border:0.9px solid #111; margin-bottom:10px}
+  .rep-day-row{display:flex; border-bottom:0.4px solid #B8B8B8}
+  .rep-day-row:last-child{border-bottom:none}
+  .rep-day-label{flex:0 0 96px; font-size:.72rem; font-weight:700; padding:6px 6px; border-right:0.4px solid #B8B8B8}
+  .rep-day-val{flex:1; font-size:.76rem; padding:6px 6px; line-height:1.4}
+  .rep-small{font-size:.68rem; color:#5A5A5A}
+  @media print{
+    .rep-bar{display:none}
+    .rep-overlay{position:static}
+  }
   .photo-preview{position:relative; display:inline-block; margin-top:2px}
   .photo-preview img{width:100px; height:100px; object-fit:cover; border-radius:10px; display:block; border:1px solid #E5E0D4}
   .photo-remove{position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:999px; background:#A8473A; border:2px solid #fff; display:flex; align-items:center; justify-content:center; cursor:pointer}
@@ -1484,6 +1504,137 @@ function openConfirmDelete(id){
 }
 
 // ================= SETTINGS MODAL =================
+function openReport(){
+  const host = document.getElementById('modalHost');
+  let start = (()=>{ const d=new Date(); d.setDate(d.getDate()-29); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })();
+  let end = todayStr();
+
+  function dayKeyOf(iso){ const d=new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+  function dateRangeArray(s,e){
+    const out=[]; let cur=new Date(s+'T00:00:00'); const endD=new Date(e+'T00:00:00');
+    while(cur<=endD){ out.push(dayKeyOf(cur.toISOString())); cur.setDate(cur.getDate()+1); }
+    return out.reverse();
+  }
+  function fmtLongDate(ds){
+    const [y,m,d] = ds.split('-');
+    const wd = new Date(ds+'T00:00:00').toLocaleDateString('pt-BR',{weekday:'short'}).replace('.','');
+    return `${d}/${m}/${y} · ${wd}`;
+  }
+
+  function renderPicker(){
+    host.innerHTML = `<div class="overlay" id="ovRep">
+      <div class="sheet">
+        <div class="sheet-head"><div class="sheet-title">Gerar relatório</div><button class="icon-btn" id="closeRep">${icon('x',18)}</button></div>
+        <div class="sheet-body">
+          <div class="field"><label>De</label>${dtField('rep_start','date',start)}</div>
+          <div class="field"><label>Até</label>${dtField('rep_end','date',end)}</div>
+        </div>
+        <div class="sheet-foot"><button class="btn-primary" id="genRepBtn">Gerar relatório</button></div>
+      </div>
+    </div>`;
+    document.getElementById('ovRep').addEventListener('click', e=>{ if(e.target.id==='ovRep') closeModal(); });
+    document.getElementById('closeRep').addEventListener('click', closeModal);
+    wireDtField('rep_start', v=> start=v);
+    wireDtField('rep_end', v=> end=v);
+    document.getElementById('genRepBtn').addEventListener('click', ()=>{
+      if(!start || !end || start>end){ showWarning('Confira as datas selecionadas.'); return; }
+      renderDoc();
+    });
+  }
+
+  function weightSectionHtml(pesoEntries){
+    if(pesoEntries.length===0) return `<p class="rep-small">Sem registro de peso no período.</p>`;
+    if(pesoEntries.length===1){
+      const e = pesoEntries[0];
+      return `<p style="font-size:.85rem; margin:0">Último registro: <b>${e.value} kg</b> (${fmtDateShort(dayKeyOf(e.date))})</p>`;
+    }
+    // 2+ pontos: grafico de linha em SVG simples, sem biblioteca nenhuma
+    const W=540, H=140, PAD=28;
+    const vals = pesoEntries.map(e=>e.value);
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const range = (max-min) || 1;
+    const stepX = (W-PAD*2) / (pesoEntries.length-1);
+    const pts = pesoEntries.map((e,i)=>{
+      const x = PAD + i*stepX;
+      const y = H-PAD - ((e.value-min)/range) * (H-PAD*2);
+      return {x,y,e};
+    });
+    const path = pts.map((p,i)=> (i===0?'M':'L')+p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ');
+    const dots = pts.map(p=> `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="2.6" fill="#111"/><text x="${p.x.toFixed(1)}" y="${(p.y-8).toFixed(1)}" font-size="9" text-anchor="middle" fill="#111">${p.e.value}</text>`).join('');
+    const labels = pts.map((p,i)=> (i===0||i===pts.length-1) ? `<text x="${p.x.toFixed(1)}" y="${H-6}" font-size="8" text-anchor="middle" fill="#5A5A5A">${fmtDateShort(dayKeyOf(p.e.date))}</text>` : '').join('');
+    return `<svg viewBox="0 0 ${W} ${H}" style="width:100%; height:auto"><path d="${path}" fill="none" stroke="#111" stroke-width="1.4"/>${dots}${labels}</svg>`;
+  }
+
+  function renderDoc(){
+    const days = dateRangeArray(start,end);
+    const inRange = entries.filter(e=> { const ds=dayKeyOf(e.date); return ds>=start && ds<=end; });
+    const pesoEntries = inRange.filter(e=>e.category==='peso').slice().sort((a,b)=> new Date(a.date)-new Date(b.date));
+    const continuos = meds.filter(m=> m.tipo==='continuo');
+
+    const medRows = meds.map(m=>{
+      const horarios = m.tipo==='sob-demanda' ? 'conforme necessário' : ((m.horarios&&m.horarios.length)? m.horarios.join(', ') : '—');
+      const duracao = m.tipo==='continuo'?'Contínuo' : m.tipo==='sob-demanda'?'Sob demanda' : `Pontual (${fmtDateShort(m.dataInicio)} a ${fmtDateShort(m.dataFim)})`;
+      return `<tr><td>${esc(m.name)}</td><td>${esc(horarios)}</td><td>${esc(m.dose||'—')}</td><td>${duracao}</td></tr>`;
+    }).join('');
+
+    const dayBlocks = days.map(ds=>{
+      const dayEntries = inRange.filter(e=> dayKeyOf(e.date)===ds);
+      if(dayEntries.length===0) return '';
+      const remedios = [...new Set(dayEntries.filter(e=>e.category==='remedio').map(e=>e.title))];
+      const naoAdmin = continuos.map(m=>m.name).filter(n=> !remedios.some(r=> normalizeSearch(r)===normalizeSearch(n)));
+      const alimentacao = dayEntries.filter(e=>e.category==='alimentacao')
+        .map(e=> `${esc(e.title)}${entrySubtitle(e)?` (${esc(entrySubtitle(e))})`:''} — ${fmtTime(e.date)}`).join('; ');
+      const interc = dayEntries.filter(e=>e.category==='intercorrencia')
+        .map(e=> `${fmtTime(e.date)} — ${esc(e.title)}${e.gravidade?` (${e.gravidade})`:''}${e.note?`: "${esc(e.note)}"`:''}`).join('<br/>');
+      const proc = dayEntries.filter(e=> ['procedimento','consulta','exame'].includes(e.category))
+        .map(e=>{
+          const catLabel = {procedimento:'Procedimento',consulta:'Consulta',exame:'Exame'}[e.category];
+          let extra = e.clinica || (e.category==='exame'?e.tipoExame:'') || '';
+          return `${fmtTime(e.date)} — ${catLabel}: ${esc(e.title)}${extra?` (${esc(extra)})`:''}${e.note?` — ${esc(e.note)}`:''}`;
+        }).join('<br/>');
+
+      let rows = `<div class="rep-day-row"><div class="rep-day-label">Remédios</div><div class="rep-day-val">${remedios.length?esc(remedios.join(', ')):'—'}</div></div>`;
+      if(naoAdmin.length) rows += `<div class="rep-day-row"><div class="rep-day-label">Não administrados</div><div class="rep-day-val">${esc(naoAdmin.join(', '))}</div></div>`;
+      rows += `<div class="rep-day-row"><div class="rep-day-label">Alimentação</div><div class="rep-day-val">${alimentacao||'Sem registro'}</div></div>`;
+      if(interc) rows += `<div class="rep-day-row"><div class="rep-day-label">Intercorrência</div><div class="rep-day-val">${interc}</div></div>`;
+      if(proc) rows += `<div class="rep-day-row"><div class="rep-day-label">Procedimento</div><div class="rep-day-val">${proc}</div></div>`;
+
+      return `<div class="rep-day">
+        <div class="rep-day-row" style="background:#111; color:#fff; border-bottom:none"><div style="padding:6px 8px; font-size:.76rem; font-weight:700">${fmtLongDate(ds)}</div></div>
+        ${rows}
+      </div>`;
+    }).join('');
+
+    const nascStr = settings.birthdate ? fmtDateShort(settings.birthdate) + ` (${ageText()})` : '—';
+    const linkHtml = settings.sheetLink ? `<p style="font-size:.8rem"><a href="${esc(settings.sheetLink)}" target="_blank" rel="noreferrer" style="color:#111">Ver planilha de exames</a></p>` : '';
+
+    host.innerHTML = `<div class="rep-overlay" id="repDocHost">
+      <div class="rep-bar">
+        <button class="icon-btn" id="repBack">${icon('x',18)}</button>
+        <button class="btn-primary" id="repPrint" style="padding:8px 16px; font-size:.8rem">Imprimir / Salvar PDF</button>
+      </div>
+      <div class="rep-doc">
+        <h1 class="rep-h1">Relatório de saúde — Otto</h1>
+        <p class="rep-sub">${esc(settings.raca||'—')} · Nascimento: ${nascStr} · Período: ${fmtDateShort(start)} a ${fmtDateShort(end)}</p>
+        <hr class="rep-hr"/>
+        <div class="rep-h2">Peso</div>
+        ${weightSectionHtml(pesoEntries)}
+        <div class="rep-h2">Medicações em uso</div>
+        <table class="rep-table"><tr><th>Medicação</th><th>Horários</th><th>Posologia</th><th>Duração</th></tr>${medRows || '<tr><td colspan="4">Nenhuma cadastrada</td></tr>'}</table>
+        <div class="rep-h2">Registro diário</div>
+        ${dayBlocks || '<p class="rep-small">Nenhum registro no período.</p>'}
+        <hr class="rep-hr"/>
+        ${linkHtml}
+        <p class="rep-small">Documento gerado automaticamente pelo Diário do Otto</p>
+      </div>
+    </div>`;
+    document.getElementById('repBack').addEventListener('click', closeModal);
+    document.getElementById('repPrint').addEventListener('click', ()=> window.print());
+  }
+
+  renderPicker();
+}
+
 function openSettings(){
   const host = document.getElementById('modalHost');
   let draftPhotoBlob = null;
@@ -1518,6 +1669,7 @@ function openSettings(){
           <div class="field"><label>Link da planilha de exames (opcional, Google Sheets)</label><input id="linkInput" value="${esc(draftSheetLink)}" placeholder="https://..."/></div>
           <div class="field"><label>Link do app da creche (opcional)</label><input id="crecheLinkInput" value="${esc(draftCrecheLink)}" placeholder="https://..."/></div>
           <div style="display:flex; justify-content:center; gap:16px; padding-top:10px; margin-top:6px; border-top:1px solid #F1EEE6">
+            <button type="button" id="reportBtn" style="background:none; border:none; font-size:.7rem; color:var(--ink-muted); cursor:pointer">Gerar relatório</button>
             <button type="button" id="importBtn" style="background:none; border:none; font-size:.7rem; color:var(--ink-muted); cursor:pointer">Restaurar backup</button>
             <input type="file" id="importFileInput" accept="application/json" style="display:none"/>
           </div>
@@ -1531,6 +1683,7 @@ function openSettings(){
     const linkEl = document.getElementById('linkInput'); linkEl.addEventListener('input', e=> draftSheetLink=e.target.value);
     const crecheLinkEl = document.getElementById('crecheLinkInput'); crecheLinkEl.addEventListener('input', e=> draftCrecheLink=e.target.value);
     const importFileEl = document.getElementById('importFileInput');
+    document.getElementById('reportBtn').addEventListener('click', ()=> openReport());
     document.getElementById('importBtn').addEventListener('click', ()=> importFileEl.click());
     importFileEl.addEventListener('change', async (e)=>{
       const file = e.target.files[0];
