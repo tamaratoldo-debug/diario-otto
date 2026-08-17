@@ -366,6 +366,28 @@ let meds = store.get('otto:meds', []);
   });
   if(changed) store.set('otto:meds', meds);
 })();
+// Fusão: antes de hoje, "2x ao dia" só dava pra fazer cadastrando o mesmo
+// remédio duas vezes (um pra cada horário). Agora que um remédio aceita
+// vários horários, junta automaticamente os que têm mesmo nome/tipo/período
+// num só, somando os horários de todos.
+(function mergeDuplicateMedsByName(){
+  const groups = new Map();
+  for(const m of meds){
+    const key = [m.name.trim().toLowerCase(), m.tipo, m.dataInicio||'', m.dataFim||''].join('|');
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(m);
+  }
+  let changed = false;
+  const merged = [];
+  for(const group of groups.values()){
+    if(group.length===1){ merged.push(group[0]); continue; }
+    changed = true;
+    const horarios = [...new Set(group.flatMap(m=> m.horarios||[]))].sort();
+    const withDose = group.find(m=> m.dose);
+    merged.push({ ...group[0], horarios, dose: withDose ? withDose.dose : group[0].dose });
+  }
+  if(changed){ meds = merged; store.set('otto:meds', meds); }
+})();
 (function dedupeMeds(){
   const seen = new Set();
   const deduped = meds.filter(m=>{
