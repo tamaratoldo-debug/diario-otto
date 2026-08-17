@@ -1758,7 +1758,6 @@ function openMedManager(onDone, jumpToId, startAdding){
         <div class="field"><label>Início</label>${dtField('d_inicio','date',draft.dataInicio)}</div>
         <div class="field"><label>Fim</label>${dtField('d_fim','date',draft.dataFim)}</div>
       ` : ''}
-      ${draft.tipo==='sob-demanda'? `<div class="hint" style="margin-bottom:4px">Fica salvo, sem horário fixo, pra você tocar e registrar só quando precisar (não entra no checklist de hoje).</div>` : ''}
       <div class="field"><label>Dose / instruções (opcional)</label><input id="d_dose" autocomplete="off" value="${esc(draft.dose)}" placeholder="ex: 1 comprimido"/></div>
       ${isScheduled? `<div class="field"><label>Horários</label>
         <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px">
