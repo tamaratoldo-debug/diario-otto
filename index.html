@@ -1668,9 +1668,9 @@ function openSettings(){
           <div class="field"><label>Data de nascimento (opcional)</label>${dtField('birthdateInput','date',draftBirthdate)}</div>
           <div class="field"><label>Link da planilha de exames (opcional, Google Sheets)</label><input id="linkInput" value="${esc(draftSheetLink)}" placeholder="https://..."/></div>
           <div class="field"><label>Link do app da creche (opcional)</label><input id="crecheLinkInput" value="${esc(draftCrecheLink)}" placeholder="https://..."/></div>
-          <div style="display:flex; justify-content:center; gap:16px; padding-top:10px; margin-top:6px; border-top:1px solid #F1EEE6">
-            <button type="button" id="reportBtn" style="background:none; border:none; font-size:.7rem; color:var(--ink-muted); cursor:pointer">Gerar relatório</button>
-            <button type="button" id="importBtn" style="background:none; border:none; font-size:.7rem; color:var(--ink-muted); cursor:pointer">Restaurar backup</button>
+          <div style="display:flex; gap:10px; padding-top:14px; margin-top:6px; border-top:1px solid #F1EEE6">
+            <button type="button" id="reportBtn" class="btn-secondary" style="flex:1; font-size:.82rem; padding:11px 8px">Gerar relatório</button>
+            <button type="button" id="importBtn" class="btn-secondary" style="flex:1; font-size:.82rem; padding:11px 8px">Restaurar backup</button>
             <input type="file" id="importFileInput" accept="application/json" style="display:none"/>
           </div>
         </div>
