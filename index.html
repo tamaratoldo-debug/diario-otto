@@ -47,6 +47,9 @@
   .section-title{font-size:.9rem; font-weight:600}
 
   .pending-checkbox{width:18px; height:18px; border-radius:50%; border:2px solid #7FB89A; flex-shrink:0; display:flex; align-items:center; justify-content:center}
+  .swipe-row{position:relative; overflow:hidden}
+  .swipe-content{position:relative; touch-action:pan-y}
+  .swipe-delete{position:absolute; top:0; right:0; bottom:0; width:76px; background:#B3261E; color:#fff; border:none; display:flex; align-items:center; justify-content:center; font-size:.72rem; font-weight:600}
   .photo-preview{position:relative; display:inline-block; margin-top:2px}
   .photo-preview img{width:100px; height:100px; object-fit:cover; border-radius:10px; display:block; border:1px solid #E5E0D4}
   .photo-remove{position:absolute; top:-6px; right:-6px; width:22px; height:22px; border-radius:999px; background:#A8473A; border:2px solid #fff; display:flex; align-items:center; justify-content:center; cursor:pointer}
@@ -612,6 +615,35 @@ function pastMedGroupHtml(dayKey, remedioEntries, forceOpen){
   return `${header}<div style="background:${CATEGORIES.remedio.hex}0F; border-radius:12px; padding:0 10px; margin-bottom:8px">${rows}</div>`;
 }
 
+// Arrastar pra esquerda revela um botão de excluir, igual ao padrão do iOS.
+// Só entra em ação depois que dá pra saber que o gesto é horizontal (não
+// atrapalha a rolagem vertical normal da página).
+function wireSwipeToDelete(row, onDelete){
+  const content = row.querySelector('.swipe-content');
+  const delBtn = row.querySelector('[data-swipe-del]');
+  let startX=0, startY=0, curX=0, dragging=false, decided=false, horizontal=false;
+  row.addEventListener('touchstart', e=>{
+    startX=e.touches[0].clientX; startY=e.touches[0].clientY; dragging=true; decided=false; horizontal=false;
+    content.style.transition='none';
+  }, {passive:true});
+  row.addEventListener('touchmove', e=>{
+    if(!dragging) return;
+    const dx = e.touches[0].clientX-startX;
+    const dy = e.touches[0].clientY-startY;
+    if(!decided && (Math.abs(dx)>6 || Math.abs(dy)>6)){ decided=true; horizontal = Math.abs(dx)>Math.abs(dy); }
+    if(!horizontal) return;
+    curX = Math.min(0, Math.max(-76, dx));
+    content.style.transform = `translateX(${curX}px)`;
+    e.preventDefault();
+  }, {passive:false});
+  row.addEventListener('touchend', ()=>{
+    dragging=false;
+    content.style.transition='transform .15s';
+    content.style.transform = curX < -38 ? 'translateX(-76px)' : 'translateX(0)';
+  });
+  if(delBtn) delBtn.addEventListener('click', ()=> onDelete(row.dataset.swipeId));
+}
+
 function pendingRowsHtml(activeSlots, adHocEntries){
   adHocEntries = adHocEntries || [];
   if(activeSlots.length===0 && adHocEntries.length===0) return '';
@@ -649,11 +681,22 @@ function pendingRowsHtml(activeSlots, adHocEntries){
         <div class="entry-sub">${sub}</div>
       </button>
       <span class="pending-checkbox" style="background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}; flex-shrink:0">${icon('check',11,'#fff')}</span>`;
-    return { sortKey: fmtTime(e.date), inner };
+    return { sortKey: fmtTime(e.date), inner, swipeId: e.id };
   });
 
   const allRows = [...medRows, ...adHocRows].sort((a,b)=> a.sortKey.localeCompare(b.sortKey));
-  const rows = allRows.map((row, idx)=> `<div class="entry-row" style="display:flex; align-items:center; gap:8px; cursor:default; padding:10px 0; ${idx===allRows.length-1?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)'}">${row.inner}</div>`).join('');
+  const rows = allRows.map((row, idx)=>{
+    const borderStyle = idx===allRows.length-1?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)';
+    if(row.swipeId){
+      // Doses avulsas (sob demanda / já registradas) só dá pra desfazer apagando —
+      // arrasta pra esquerda pra revelar o excluir, igual o padrão do iOS.
+      return `<div class="swipe-row" data-swipe-id="${row.swipeId}" style="${borderStyle}">
+        <button class="swipe-delete" data-swipe-del="${row.swipeId}">${icon('trash',15,'#fff')}</button>
+        <div class="swipe-content entry-row" style="display:flex; align-items:center; gap:8px; cursor:default; padding:10px 0; background:${CATEGORIES.remedio.hex}0F; border-bottom:none">${row.inner}</div>
+      </div>`;
+    }
+    return `<div class="entry-row" style="display:flex; align-items:center; gap:8px; cursor:default; padding:10px 0; ${borderStyle}">${row.inner}</div>`;
+  }).join('');
 
   return `${header}<div style="background:${CATEGORIES.remedio.hex}0F; border-radius:12px; padding:0 10px; margin-bottom:8px">${rows}</div>`;
 }
@@ -830,6 +873,11 @@ function renderTimeline(){
   }
   host.innerHTML = html;
   host.querySelectorAll('[data-id]').forEach(b=> b.addEventListener('click', ()=> openEntryModal(null, b.dataset.id)));
+  host.querySelectorAll('.swipe-row').forEach(row=> wireSwipeToDelete(row, id=>{
+    entries = entries.filter(e=> e.id!==id);
+    persistEntries();
+    renderAll();
+  }));
   host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med, b.dataset.horario)));
   host.querySelectorAll('[data-med-edit]').forEach(b=> b.addEventListener('click', ()=> openMedManager(()=> renderAll(), b.dataset.medEdit)));
   host.querySelectorAll('[data-daysquare]').forEach(b=> b.addEventListener('click', ()=>{
