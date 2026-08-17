@@ -1138,8 +1138,8 @@ function openEntryModal(category, editId){
       </div>`;
     }
     if(category==='exame'){
-      h += `<div class="field"><label>Tipo de exame</label><input id="f_tipoExame" value="${esc(form.tipoExame)}" placeholder="ex: Sangue, Imagem, Urina..."/></div>
-      ${settings.sheetLink ? `<a href="${esc(settings.sheetLink)}" target="_blank" rel="noreferrer" class="link-btn" style="color:${cat.hex}; margin-bottom:14px; display:inline-flex; align-items:center; gap:5px">${icon('external',13,cat.hex)} Ver planilha de exames</a>` : ''}`;
+      h += `${settings.sheetLink ? `<a href="${esc(settings.sheetLink)}" target="_blank" rel="noreferrer" class="add-trigger" style="margin-bottom:14px; text-decoration:none">${icon('external',15,cat.hex)} Ver planilha de exames</a>` : ''}
+      <div class="field"><label>Tipo de exame</label><input id="f_tipoExame" value="${esc(form.tipoExame)}" placeholder="ex: Sangue, Imagem, Urina..."/></div>`;
     }
     if(quickPick){
       return h;
