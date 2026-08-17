@@ -1592,7 +1592,7 @@ function openReport(){
         });
       });
       const alimentacao = dayEntries.filter(e=>e.category==='alimentacao')
-        .map(e=> `${esc(e.title)}${entrySubtitle(e)?` (${esc(entrySubtitle(e))})`:''} — ${fmtTime(e.date)}`).join('; ');
+        .map(e=> `${fmtTime(e.date)} — ${esc(e.title)}${entrySubtitle(e)?` (${esc(entrySubtitle(e))})`:''}`).join('<br/>');
       const interc = dayEntries.filter(e=>e.category==='intercorrencia')
         .map(e=> `${fmtTime(e.date)} — ${esc(e.title)}${e.gravidade?` (${e.gravidade})`:''}${e.note?`: "${esc(e.note)}"`:''}`).join('<br/>');
       const proc = dayEntries.filter(e=> ['procedimento','consulta','exame'].includes(e.category))
