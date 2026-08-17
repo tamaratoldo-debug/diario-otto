@@ -379,14 +379,43 @@ let meds = store.get('otto:meds', []);
   }
   let changed = false;
   const merged = [];
+  const idRemap = {}; // id do remedio descartado -> id do que sobreviveu
   for(const group of groups.values()){
     if(group.length===1){ merged.push(group[0]); continue; }
     changed = true;
+    const survivor = group[0];
     const horarios = [...new Set(group.flatMap(m=> m.horarios||[]))].sort();
     const withDose = group.find(m=> m.dose);
-    merged.push({ ...group[0], horarios, dose: withDose ? withDose.dose : group[0].dose });
+    merged.push({ ...survivor, horarios, dose: withDose ? withDose.dose : survivor.dose });
+    for(const m of group){ if(m.id!==survivor.id) idRemap[m.id] = survivor.id; }
   }
-  if(changed){ meds = merged; store.set('otto:meds', meds); }
+  if(changed){
+    meds = merged;
+    store.set('otto:meds', meds);
+    // Redireciona lançamentos já feitos que apontavam pro remédio descartado
+    let entriesChanged = false;
+    entries = entries.map(e=>{
+      if(e.medId && idRemap[e.medId]){ entriesChanged = true; return { ...e, medId: idRemap[e.medId] }; }
+      return e;
+    });
+    if(entriesChanged) writeStore('otto:entries', entries);
+  }
+})();
+// Reparo: lançamentos de remédio cujo medId não existe mais em nenhum remédio
+// cadastrado (por causa da fusão que rodou antes desse reparo existir) ficam
+// "órfãos". Tenta religar pelo nome; se não achar, só solta o medId (volta a
+// virar um lançamento avulso normal, sem travar preso a um id morto).
+(function repairOrphanMedEntries(){
+  const idSet = new Set(meds.map(m=>m.id));
+  const byName = new Map(meds.map(m=>[m.name.trim().toLowerCase(), m.id]));
+  let changed = false;
+  entries = entries.map(e=>{
+    if(e.category!=='remedio' || !e.medId || idSet.has(e.medId)) return e;
+    changed = true;
+    const foundId = e.title ? byName.get(e.title.trim().toLowerCase()) : null;
+    return { ...e, medId: foundId || null };
+  });
+  if(changed) writeStore('otto:entries', entries);
 })();
 (function dedupeMeds(){
   const seen = new Set();
