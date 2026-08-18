@@ -672,7 +672,11 @@ function pastMedGroupHtml(dayKey, remedioEntries, forceOpen){
   if(!isOpen) return header;
   const sorted = remedioEntries.slice().sort((a,b)=> fmtTime(a.date).localeCompare(fmtTime(b.date)));
   const rows = sorted.map((e, idx)=>{
-    const sub = [fmtTime(e.date), e.note].filter(Boolean).join(' · ');
+    // Tenta achar o remédio ainda cadastrado, pra mostrar "Contínuo"/"Até
+    // tal data" igual o checklist de hoje mostra — mesmo padrão nos dois.
+    const med = e.medId ? meds.find(m=>m.id===e.medId) : meds.find(m=> normalizeSearch(m.name)===normalizeSearch(e.title||''));
+    const tipoLabel = med ? (med.tipo==='continuo' ? 'Contínuo' : med.tipo==='sob-demanda' ? 'Sob demanda' : `Até ${fmtDateShort(med.dataFim)}`) : '';
+    const sub = [tipoLabel, fmtTime(e.date), e.note].filter(Boolean).join(' · ');
     return `<div class="entry-row" style="display:flex; align-items:center; gap:8px; cursor:default; padding:10px 0; ${idx===sorted.length-1?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)'}">
       <button data-id="${e.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(e.title)}</span></div>
