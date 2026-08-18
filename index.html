@@ -389,6 +389,20 @@ let meds = store.get('otto:meds', []);
   });
   if(changed) store.set('otto:meds', meds);
 })();
+// Migração: cada horário agora tem sua própria dose (ex: CBD pode ser 6 gts de
+// manhã e 11 à noite). Remédios antigos tinham 1 dose só pra todos os
+// horários — aqui ela é copiada pra cada horário, sem perder o que já tinha.
+(function migrateMedsToPerHorarioDose(){
+  let changed = false;
+  meds = meds.map(m=>{
+    if(!m.horarios || m.horarios.length===0) return m;
+    if(typeof m.horarios[0] === 'object') return m;
+    changed = true;
+    const horarios = m.horarios.map(h=> ({ time:h, dose:m.dose||'' }));
+    return { ...m, horarios };
+  });
+  if(changed) store.set('otto:meds', meds);
+})();
 // Fusão: antes de hoje, "2x ao dia" só dava pra fazer cadastrando o mesmo
 // remédio duas vezes (um pra cada horário). Agora que um remédio aceita
 // vários horários, junta automaticamente os que têm mesmo nome/tipo/período
@@ -407,9 +421,10 @@ let meds = store.get('otto:meds', []);
     if(group.length===1){ merged.push(group[0]); continue; }
     changed = true;
     const survivor = group[0];
-    const horarios = [...new Set(group.flatMap(m=> m.horarios||[]))].sort();
-    const withDose = group.find(m=> m.dose);
-    merged.push({ ...survivor, horarios, dose: withDose ? withDose.dose : survivor.dose });
+    const byTime = new Map();
+    for(const m of group){ for(const h of (m.horarios||[])){ if(!byTime.has(h.time)) byTime.set(h.time, h); } }
+    const horarios = [...byTime.values()].sort((a,b)=> a.time.localeCompare(b.time));
+    merged.push({ ...survivor, horarios });
     for(const m of group){ if(m.id!==survivor.id) idRemap[m.id] = survivor.id; }
   }
   if(changed){
@@ -443,7 +458,7 @@ let meds = store.get('otto:meds', []);
 (function dedupeMeds(){
   const seen = new Set();
   const deduped = meds.filter(m=>{
-    const key = m.name.trim().toLowerCase()+'|'+(m.horarios||[]).join(',');
+    const key = m.name.trim().toLowerCase()+'|'+(m.horarios||[]).map(h=>h.time).join(',');
     if(seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -598,8 +613,8 @@ function pendingSlotsForToday(){
   const active = meds.filter(isMedActiveToday);
   const slots = [];
   for(const m of active){
-    const horarios = (m.horarios && m.horarios.length>0) ? m.horarios : [''];
-    for(const h of horarios) slots.push({ med:m, horario:h });
+    const horarios = (m.horarios && m.horarios.length>0) ? m.horarios : [{time:'', dose:m.dose||''}];
+    for(const h of horarios) slots.push({ med:m, horario:h.time, dose:h.dose });
   }
   return slots;
 }
@@ -654,7 +669,7 @@ function pendingRowsHtml(activeSlots, adHocEntries){
   const medRows = sortedSlots.map(s=>{
     const m = s.med;
     const given = dosesGivenToday(m, s.horario).length > 0;
-    const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${s.horario?' · '+s.horario:''}${m.dose?' · '+esc(m.dose):''}`;
+    const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${s.horario?' · '+s.horario:''}${s.dose?' · '+esc(s.dose):''}`;
     const inner = `<button data-med-edit="${m.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
         <div class="entry-sub">${sub}</div>
@@ -691,8 +706,10 @@ function toggleMedToday(medId, horario){
     entries = entries.filter(e=> !idsToRemove.has(e.id));
   } else {
     let date = new Date();
+    const slot = (med.horarios||[]).find(h=> h.time===horario);
+    const dose = slot ? slot.dose : med.dose;
     if(horario){ const [h,m2] = horario.split(':').map(Number); date.setHours(h,m2,0,0); }
-    entries.push({ id:genId(), category:'remedio', medId:med.id, horarioSlot:horario||'', title:med.name, note:med.dose||'', date:date.toISOString(), createdAt:Date.now() });
+    entries.push({ id:genId(), category:'remedio', medId:med.id, horarioSlot:horario||'', title:med.name, note:dose||'', date:date.toISOString(), createdAt:Date.now() });
   }
   entries.sort((a,b)=> new Date(b.date)-new Date(a.date));
   persistEntries();
@@ -1084,7 +1101,7 @@ function openEntryModal(category, editId){
         const scheduled = meds.filter(m=> m.tipo!=='sob-demanda');
         const onDemand = meds.filter(m=> m.tipo==='sob-demanda');
         const cardHtml = m=>{
-          let sub = m.tipo==='sob-demanda' ? (m.dose?esc(m.dose):'') : `${(m.horarios||[]).join(', ')}${(m.horarios&&m.horarios.length&&m.dose)?' · ':''}${m.dose?esc(m.dose):''}`;
+          let sub = m.tipo==='sob-demanda' ? (m.dose?esc(m.dose):'') : (m.horarios||[]).map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ');
           let givenBadge = '';
           if(m.tipo==='sob-demanda'){
             const given = dosesGivenToday(m, '');
@@ -1094,7 +1111,7 @@ function openEntryModal(category, editId){
             return `<div class="med-pick-btn" style="padding:9px 10px; width:100%">
               <div class="mp-name" style="margin-bottom:6px">${esc(m.name)} — qual horário?</div>
               <div style="display:flex; gap:6px; flex-wrap:wrap">
-                ${m.horarios.map(h=>`<button type="button" class="pick-btn" data-quickloghorario="${m.id}|${h}" style="background:${cat.hex}22">${h}</button>`).join('')}
+                ${m.horarios.map(h=>`<button type="button" class="pick-btn" data-quickloghorario="${m.id}|${h.time}" style="background:${cat.hex}22">${h.time}${h.dose?' · '+esc(h.dose):''}</button>`).join('')}
                 <button type="button" class="pick-btn" data-quickcancel="1">Cancelar</button>
               </div>
             </div>`;
@@ -1117,9 +1134,11 @@ function openEntryModal(category, editId){
       } else {
         h += `<div class="field"><label>Remédio</label>
           <div class="pickgrid" id="medPick">${meds.map(m=>{
-            const horario = (m.horarios&&m.horarios[0])||'';
-            const sub = `${horario}${horario&&m.dose?' · ':''}${m.dose?esc(m.dose):''}`;
-            return `<button type="button" class="med-pick-btn ${form.title===m.name?'sel':''}" style="${form.title===m.name?`background:${cat.hex}`:''}" data-id="${m.id}" data-name="${esc(m.name)}" data-dose="${esc(m.dose||'')}" data-horario="${esc(horario)}">
+            const first = (m.horarios&&m.horarios[0]) || null;
+            const horario = first ? first.time : '';
+            const dose = first ? first.dose : m.dose;
+            const sub = `${horario}${horario&&dose?' · ':''}${dose?esc(dose):''}`;
+            return `<button type="button" class="med-pick-btn ${form.title===m.name?'sel':''}" style="${form.title===m.name?`background:${cat.hex}`:''}" data-id="${m.id}" data-name="${esc(m.name)}" data-dose="${esc(dose||'')}" data-horario="${esc(horario)}">
               <div class="mp-name">${esc(m.name)}</div>
               ${sub?`<div class="mp-sub">${sub}</div>`:''}
             </button>`;
@@ -1232,7 +1251,7 @@ function openEntryModal(category, editId){
         const m = meds.find(x=>x.id===b.dataset.quicklog);
         if(!m) return;
         if(m.tipo==='sob-demanda' || !m.horarios || m.horarios.length<=1){
-          toggleMedToday(m.id, (m.horarios&&m.horarios[0]) || '');
+          toggleMedToday(m.id, (m.horarios&&m.horarios[0]&&m.horarios[0].time) || '');
           closeModal();
         } else {
           medQuickHorarioPick = m.id;
@@ -1354,7 +1373,7 @@ function openEntryModal(category, editId){
         const m = meds.find(x=>x.id===b.dataset.quicklog);
         if(!m) return;
         if(m.tipo==='sob-demanda' || !m.horarios || m.horarios.length<=1){
-          toggleMedToday(m.id, (m.horarios&&m.horarios[0]) || '');
+          toggleMedToday(m.id, (m.horarios&&m.horarios[0]&&m.horarios[0].time) || '');
           closeModal();
         } else {
           medQuickHorarioPick = m.id;
@@ -1575,9 +1594,11 @@ function openReport(){
     const continuos = meds.filter(m=> m.tipo==='continuo');
 
     const medRows = meds.map(m=>{
-      const horarios = m.tipo==='sob-demanda' ? 'conforme necessário' : ((m.horarios&&m.horarios.length)? m.horarios.join(', ') : '—');
+      const horarios = m.tipo==='sob-demanda'
+        ? (m.dose ? `conforme necessário — ${esc(m.dose)}` : 'conforme necessário')
+        : ((m.horarios&&m.horarios.length)? m.horarios.map(h=> `${h.time}${h.dose?' — '+esc(h.dose):''}`).join('<br/>') : '—');
       const duracao = m.tipo==='continuo'?'Contínuo' : m.tipo==='sob-demanda'?'Sob demanda' : `Pontual (${fmtDateShort(m.dataInicio)} a ${fmtDateShort(m.dataFim)})`;
-      return `<tr><td>${esc(m.name)}</td><td>${esc(horarios)}</td><td>${esc(m.dose||'—')}</td><td>${duracao}</td></tr>`;
+      return `<tr><td>${esc(m.name)}</td><td>${horarios}</td><td>${duracao}</td></tr>`;
     }).join('');
 
     const dayBlocks = days.map(ds=>{
@@ -1587,9 +1608,9 @@ function openReport(){
       const givenSlots = new Set(dayEntries.filter(e=>e.category==='remedio' && e.medId).map(e=> e.medId+'|'+(e.horarioSlot||'')));
       const naoAdmin = [];
       continuos.forEach(m=>{
-        const horarios = (m.horarios&&m.horarios.length) ? m.horarios : [''];
+        const horarios = (m.horarios&&m.horarios.length) ? m.horarios : [{time:'', dose:''}];
         horarios.forEach(h=>{
-          if(!givenSlots.has(m.id+'|'+h)) naoAdmin.push(h ? `${m.name} (${h})` : m.name);
+          if(!givenSlots.has(m.id+'|'+h.time)) naoAdmin.push(h.time ? `${m.name} (${h.time})` : m.name);
         });
       });
       const alimentacao = dayEntries.filter(e=>e.category==='alimentacao')
@@ -1630,7 +1651,7 @@ function openReport(){
         <div class="rep-h2">Peso</div>
         ${weightSectionHtml(pesoEntries)}
         <div class="rep-h2">Medicações utilizadas</div>
-        <table class="rep-table"><tr><th>Medicação</th><th>Horários</th><th>Posologia</th><th>Duração</th></tr>${medRows || '<tr><td colspan="4">Nenhuma cadastrada</td></tr>'}</table>
+        <table class="rep-table"><tr><th>Medicação</th><th>Horários e posologia</th><th>Duração</th></tr>${medRows || '<tr><td colspan="3">Nenhuma cadastrada</td></tr>'}</table>
         <div class="rep-h2">Exames</div>
         ${linkHtml || '<p class="rep-small">Nenhum link cadastrado.</p>'}
         <div class="rep-h2 rep-daily-start">Registro diário</div>
@@ -1842,7 +1863,7 @@ function openMedManager(onDone, jumpToId, startAdding){
     if(m){
       editingId = m.id;
       adding = true;
-      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).slice() };
+      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).map(h=>({...h})) };
     }
   } else if(startAdding){
     adding = true;
@@ -1850,8 +1871,8 @@ function openMedManager(onDone, jumpToId, startAdding){
 
   function medSubLabel(m){
     if(m.tipo==='sob-demanda') return 'Sob demanda' + (m.dose?' · '+esc(m.dose):'');
-    const horarios = (m.horarios&&m.horarios.length) ? m.horarios.join(', ') : '';
-    return `${m.tipo==='continuo'?'Contínuo':`Pontual · ${fmtDateShort(m.dataInicio)} a ${fmtDateShort(m.dataFim)}`}${horarios?' · '+horarios:''}${m.dose?' · '+esc(m.dose):''}`;
+    const horarios = (m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : '';
+    return `${m.tipo==='continuo'?'Contínuo':`Pontual · ${fmtDateShort(m.dataInicio)} a ${fmtDateShort(m.dataFim)}`}${horarios?' · '+horarios:''}`;
   }
 
   function render(){
@@ -1887,7 +1908,7 @@ function openMedManager(onDone, jumpToId, startAdding){
       if(!m) return;
       editingId = m.id;
       adding = true;
-      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).slice() };
+      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).map(h=>({...h})) };
       syncMedListVisibility();
       renderAddArea();
       document.getElementById('addArea').scrollIntoView({behavior:'smooth', block:'center'});
@@ -1904,7 +1925,7 @@ function openMedManager(onDone, jumpToId, startAdding){
     const area = document.getElementById('addArea');
     if(!adding){
       area.innerHTML = `<button class="add-trigger" id="startAdd" style="margin-bottom:14px">${icon('plus',15)} Cadastrar remédio</button>`;
-      document.getElementById('startAdd').addEventListener('click', ()=>{ adding=true; editingId=null; draft={name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[]}; syncMedListVisibility(); renderAddArea(); });
+      document.getElementById('startAdd').addEventListener('click', ()=>{ adding=true; editingId=null; draft={name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[], newHorarioTime:'', newHorarioDose:''}; syncMedListVisibility(); renderAddArea(); });
       return;
     }
     const isScheduled = draft.tipo==='continuo' || draft.tipo==='pontual';
@@ -1920,15 +1941,19 @@ function openMedManager(onDone, jumpToId, startAdding){
         <div class="field"><label>Início</label>${dtField('d_inicio','date',draft.dataInicio)}</div>
         <div class="field"><label>Fim</label>${dtField('d_fim','date',draft.dataFim)}</div>
       ` : ''}
-      <div class="field"><label>Dose / instruções (opcional)</label><input id="d_dose" autocomplete="off" value="${esc(draft.dose)}" placeholder="ex: 1 comprimido"/></div>
-      ${isScheduled? `<div class="field"><label>Horários</label>
-        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px">
-          ${draft.horarios.map((h,i)=>`<span style="display:inline-flex; align-items:center; gap:5px; background:${CATEGORIES.remedio.hex}18; color:${CATEGORIES.remedio.hex}; border-radius:8px; padding:5px 6px 5px 10px; font-size:.82rem; font-weight:600">${h}<button type="button" data-rm-horario="${i}" style="background:none; border:none; padding:2px; display:flex; color:inherit">${icon('x',12,CATEGORIES.remedio.hex)}</button></span>`).join('') || '<span class="hint">Nenhum horário adicionado ainda.</span>'}
+      ${!isScheduled? `<div class="field"><label>Dose / instruções (opcional)</label><input id="d_dose" autocomplete="off" value="${esc(draft.dose)}" placeholder="ex: 1 comprimido"/></div>` : ''}
+      ${isScheduled? `<div class="field"><label>Horários e posologia</label>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px">
+          ${draft.horarios.map((h,i)=>`<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:${CATEGORIES.remedio.hex}18; border-radius:8px; padding:7px 8px 7px 12px">
+            <span style="font-size:.85rem; font-weight:600; color:${CATEGORIES.remedio.hex}">${h.time}${h.dose?' · '+esc(h.dose):''}</span>
+            <button type="button" data-rm-horario="${i}" style="background:none; border:none; padding:2px; display:flex; color:${CATEGORIES.remedio.hex}">${icon('x',13,CATEGORIES.remedio.hex)}</button>
+          </div>`).join('') || '<span class="hint">Nenhum horário adicionado ainda.</span>'}
         </div>
-        <div style="display:flex; gap:8px">
+        <div style="display:flex; gap:8px; align-items:flex-end">
           <div style="flex:1">${dtField('d_horario_new','time','')}</div>
-          <button type="button" class="btn-secondary" id="addHorarioBtn">Adicionar</button>
+          <div style="flex:1"><input id="d_horario_dose" autocomplete="off" placeholder="dose (opcional)" style="width:100%; padding:11px 12px; border-radius:10px; border:1px solid #E5E0D4; font-family:inherit; font-size:.9rem; box-sizing:border-box"/></div>
         </div>
+        <button type="button" class="btn-secondary" id="addHorarioBtn" style="width:100%; margin-top:8px">Adicionar horário</button>
       </div>` : ''}
       <div style="display:flex; gap:8px; margin-top:4px">
         ${editingId? `<button class="btn-secondary" id="deleteMedBtn" style="color:#B3261E; padding:0 14px">${icon('trash',16,'#B3261E')}</button>` : ''}
@@ -1947,14 +1972,20 @@ function openMedManager(onDone, jumpToId, startAdding){
     document.querySelectorAll('[data-tipo]').forEach(b=> b.addEventListener('click', ()=>{ draft.tipo=b.dataset.tipo; renderAddArea(); }));
     wireDtField('d_inicio', v=> draft.dataInicio=v);
     wireDtField('d_fim', v=> draft.dataFim=v);
-    document.getElementById('d_dose').addEventListener('input', e=> draft.dose=e.target.value);
+    const doseInput = document.getElementById('d_dose');
+    if(doseInput) doseInput.addEventListener('input', e=> draft.dose=e.target.value);
     if(isScheduled){
       let newHorarioVal = '';
       wireDtField('d_horario_new', v=> newHorarioVal=v);
       document.getElementById('addHorarioBtn').addEventListener('click', ()=>{
         if(!newHorarioVal) return;
-        if(!draft.horarios.includes(newHorarioVal)) draft.horarios.push(newHorarioVal);
-        draft.horarios.sort();
+        const doseVal = document.getElementById('d_horario_dose').value.trim();
+        if(draft.horarios.some(h=>h.time===newHorarioVal)){
+          draft.horarios = draft.horarios.map(h=> h.time===newHorarioVal ? {time:newHorarioVal, dose:doseVal} : h);
+        } else {
+          draft.horarios.push({time:newHorarioVal, dose:doseVal});
+        }
+        draft.horarios.sort((a,b)=> a.time.localeCompare(b.time));
         renderAddArea();
       });
       document.querySelectorAll('[data-rm-horario]').forEach(b=> b.addEventListener('click', ()=>{
@@ -1977,8 +2008,8 @@ function openMedManager(onDone, jumpToId, startAdding){
         name:n, tipo:draft.tipo,
         dataInicio: draft.tipo==='pontual'?draft.dataInicio:'',
         dataFim: draft.tipo==='pontual'?draft.dataFim:'',
-        dose:draft.dose.trim(),
-        horarios: (draft.tipo==='continuo'||draft.tipo==='pontual') ? draft.horarios.slice() : []
+        dose: draft.tipo==='sob-demanda' ? draft.dose.trim() : '',
+        horarios: (draft.tipo==='continuo'||draft.tipo==='pontual') ? draft.horarios.map(h=>({...h})) : []
       };
       if(editingId){
         list = list.map(m=> m.id===editingId ? { ...m, ...payload } : m);
