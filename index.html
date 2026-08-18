@@ -439,7 +439,41 @@ let meds = store.get('otto:meds', []);
     if(entriesChanged) writeStore('otto:entries', entries);
   }
 })();
-// Reparo: lançamentos de remédio cujo medId não existe mais em nenhum remédio
+// Segunda fusão, mais tolerante: a primeira só juntava remédios com nome+tipo
+// e MESMO início/fim exatos. Essa aqui junta só por nome+tipo (ignora
+// pequenas diferenças de data), pra pegar duplicatas que escaparam da
+// primeira passada — somando os horários de cada cópia num remédio só.
+(function mergeDuplicateMedsByNameLoose(){
+  const groups = new Map();
+  for(const m of meds){
+    const key = m.name.trim().toLowerCase()+'|'+m.tipo;
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(m);
+  }
+  let changed = false;
+  const merged = [];
+  const idRemap2 = {};
+  for(const group of groups.values()){
+    if(group.length===1){ merged.push(group[0]); continue; }
+    changed = true;
+    const survivor = group.reduce((a,b)=> (a.horarios||[]).length >= (b.horarios||[]).length ? a : b);
+    const byTime = new Map();
+    for(const m of group){ for(const h of (m.horarios||[])){ if(!byTime.has(h.time) || !byTime.get(h.time).dose) byTime.set(h.time, h); } }
+    const horarios = [...byTime.values()].sort((a,b)=> a.time.localeCompare(b.time));
+    merged.push({ ...survivor, horarios });
+    for(const m of group){ if(m.id!==survivor.id) idRemap2[m.id] = survivor.id; }
+  }
+  if(changed){
+    meds = merged;
+    store.set('otto:meds', meds);
+    let entriesChanged = false;
+    entries = entries.map(e=>{
+      if(e.medId && idRemap2[e.medId]){ entriesChanged = true; return { ...e, medId: idRemap2[e.medId] }; }
+      return e;
+    });
+    if(entriesChanged) writeStore('otto:entries', entries);
+  }
+})();
 // cadastrado (por causa da fusão que rodou antes desse reparo existir) ficam
 // "órfãos". Tenta religar pelo nome; se não achar, só solta o medId (volta a
 // virar um lançamento avulso normal, sem travar preso a um id morto).
