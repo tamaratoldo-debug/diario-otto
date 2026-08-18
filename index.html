@@ -820,6 +820,7 @@ function renderTimeline(){
   const activeSlotsToday = showPending ? pendingSlotsForToday() : [];
   const activeMedNamesToday = new Set(activeSlotsToday.map(s=>s.med.name.toLowerCase()));
   const activeSlotKeys = new Set(activeSlotsToday.map(s=> s.med.id+'|'+(s.horario||'')));
+  const activeSlotKeysByName = new Set(activeSlotsToday.map(s=> normalizeSearch(s.med.name)+'|'+(s.horario||'')));
   const todayKey = new Date().toDateString();
   const todayMonthKey = fmtMonthYear(new Date().toISOString());
 
@@ -832,6 +833,9 @@ function renderTimeline(){
     // Importante: o "match" precisa ser por remédio+horário, não só remédio — senão, se você
     // editar o horário de um remédio depois de já ter dado a dose de hoje, esse registro antigo
     // fica preso (não bate mais com nenhum horário atual) e simplesmente some da tela.
+    // Também casa por NOME+horário além de por id — assim, um lançamento antigo com o id
+    // quebrado (de antes de uma fusão de remédios duplicados) ainda é reconhecido como "o
+    // mesmo remédio" e não aparece feito uma cópia solta.
     const todayDate = todayStr();
     for(const month of months){
       if(month.key!==todayMonthKey) continue;
@@ -839,8 +843,9 @@ function renderTimeline(){
         if(day.key!==todayKey) continue;
         day.items = day.items.filter(e=> {
           if(e.category!=='remedio' || !isSameDay(e.date, todayDate)) return true;
-          const matches = e.medId ? activeSlotKeys.has(e.medId+'|'+(e.horarioSlot||'')) : (e.title && activeMedNamesToday.has(e.title.toLowerCase()));
-          if(matches) return false;
+          const matchesById = e.medId && activeSlotKeys.has(e.medId+'|'+(e.horarioSlot||''));
+          const matchesByName = e.title && activeSlotKeysByName.has(normalizeSearch(e.title)+'|'+(e.horarioSlot||''));
+          if(matchesById || matchesByName) return false;
           adHocMedEntriesToday.push(e);
           return false;
         });
