@@ -818,7 +818,7 @@ function renderTimeline(){
   // Only show the today's meds checklist when it's meaningful: no filter narrowing to something unrelated, no active search.
   const showPending = (filter==='todos' || filter==='remedio') && !search.trim();
   const activeSlotsToday = showPending ? pendingSlotsForToday() : [];
-  const activeMedNamesToday = new Set(activeSlotsToday.map(s=>s.med.name.toLowerCase()));
+  const activeMedNamesToday = new Set(activeSlotsToday.map(s=>normalizeSearch(s.med.name)));
   const activeSlotKeys = new Set(activeSlotsToday.map(s=> s.med.id+'|'+(s.horario||'')));
   const activeSlotKeysByName = new Set(activeSlotsToday.map(s=> normalizeSearch(s.med.name)+'|'+(s.horario||'')));
   const todayKey = new Date().toDateString();
@@ -845,7 +845,11 @@ function renderTimeline(){
           if(e.category!=='remedio' || !isSameDay(e.date, todayDate)) return true;
           const matchesById = e.medId && activeSlotKeys.has(e.medId+'|'+(e.horarioSlot||''));
           const matchesByName = e.title && activeSlotKeysByName.has(normalizeSearch(e.title)+'|'+(e.horarioSlot||''));
-          if(matchesById || matchesByName) return false;
+          // Lançamentos bem antigos, de antes do horário ser salvo por dose,
+          // não têm horarioSlot — casa só pelo nome nesse caso, pra não
+          // aparecerem soltos feito cópia.
+          const matchesByNameNoSlot = !e.horarioSlot && e.title && activeMedNamesToday.has(normalizeSearch(e.title));
+          if(matchesById || matchesByName || matchesByNameNoSlot) return false;
           adHocMedEntriesToday.push(e);
           return false;
         });
@@ -1140,7 +1144,7 @@ function openEntryModal(category, editId){
         const scheduled = meds.filter(m=> m.tipo!=='sob-demanda');
         const onDemand = meds.filter(m=> m.tipo==='sob-demanda');
         const cardHtml = m=>{
-          let sub = m.tipo==='sob-demanda' ? (m.dose?esc(m.dose):'') : (m.horarios||[]).map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ');
+          let sub = m.tipo==='sob-demanda' ? (m.dose?esc(m.dose):'') : ((m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : (m.dose?esc(m.dose):''));
           let givenBadge = '';
           if(m.tipo==='sob-demanda'){
             const given = dosesGivenToday(m, '');
@@ -1910,7 +1914,7 @@ function openMedManager(onDone, jumpToId, startAdding){
 
   function medSubLabel(m){
     if(m.tipo==='sob-demanda') return 'Sob demanda' + (m.dose?' · '+esc(m.dose):'');
-    const horarios = (m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : '';
+    const horarios = (m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : (m.dose ? esc(m.dose) : '');
     return `${m.tipo==='continuo'?'Contínuo':`Pontual · ${fmtDateShort(m.dataInicio)} a ${fmtDateShort(m.dataFim)}`}${horarios?' · '+horarios:''}`;
   }
 
