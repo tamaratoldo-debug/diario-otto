@@ -734,7 +734,11 @@ function pendingRowsHtml(activeSlots, adHocEntries){
   return `${header}<div style="background:${CATEGORIES.remedio.hex}0F; border-radius:12px; padding:0 10px; margin-bottom:8px">${rows}</div>`;
 }
 
+let medToggleLock = false;
 function toggleMedToday(medId, horario){
+  if(medToggleLock) return;
+  medToggleLock = true;
+  setTimeout(()=>{ medToggleLock = false; }, 500);
   const med = meds.find(m=>m.id===medId);
   if(!med) return;
   const givenToday = dosesGivenToday(med, horario);
