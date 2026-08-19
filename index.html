@@ -676,9 +676,15 @@ function pastMedGroupHtml(dayKey, dateStr, remedioEntries, forceOpen){
 
   const usedEntryIds = new Set();
   const slotRows = slots.map(s=>{
-    const match = remedioEntries.find(e=> !usedEntryIds.has(e.id) &&
-      ((e.medId && e.medId===s.med.id) || (!e.medId && e.title && normalizeSearch(e.title)===normalizeSearch(s.med.name))) &&
-      (e.horarioSlot||'')===(s.horario||''));
+    const sameMed = e=> (e.medId && e.medId===s.med.id) || (!e.medId && e.title && normalizeSearch(e.title)===normalizeSearch(s.med.name));
+    // Lançamentos antigos, de antes de cada dose guardar seu próprio horário,
+    // não têm horarioSlot salvo. Pra esses, casa pelo horário real do
+    // timestamp em vez do campo (que não existe) — resolve o remédio certo
+    // sem depender de um campo que não existia na época.
+    let match = remedioEntries.find(e=> !usedEntryIds.has(e.id) && sameMed(e) && (e.horarioSlot||'')===(s.horario||''));
+    if(!match && s.horario){
+      match = remedioEntries.find(e=> !usedEntryIds.has(e.id) && sameMed(e) && !e.horarioSlot && fmtTime(e.date)===s.horario);
+    }
     if(match) usedEntryIds.add(match.id);
     return { med:s.med, horario:s.horario, dose:s.dose, entry:match||null };
   });
