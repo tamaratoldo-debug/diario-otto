@@ -275,7 +275,8 @@ const fmtDateShort = ds=>{ if(!ds) return '?'; const [y,m,d]=ds.split('-'); retu
 const fmtDateDMY = ds=>{ if(!ds) return ''; const [y,m,d]=ds.split('-'); return `${d}/${m}/${y}`; };
 const isSameDay = (iso, ds)=>{ const d=new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`===ds; };
 const toLocalDateStr = (d)=> `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-const isMedActiveToday = med=>{ if(med.tipo==='sob-demanda') return false; if(med.tipo==='continuo') return true; const t=todayStr(); if(med.dataInicio && t<med.dataInicio) return false; if(med.dataFim && t>med.dataFim) return false; return true; };
+const isMedActiveOnDate = (med, t)=>{ if(med.tipo==='sob-demanda') return false; if(med.tipo==='continuo') return true; if(med.dataInicio && t<med.dataInicio) return false; if(med.dataFim && t>med.dataFim) return false; return true; };
+const isMedActiveToday = med=> isMedActiveOnDate(med, todayStr());
 const esc = s => (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 // Custom-styled date/time field: the real <input type="date/time"> stays in the DOM but invisible
@@ -632,19 +633,22 @@ function renderQuickActions(){
 }
 
 // ---------- pending meds (rendered inline inside today's day-card) ----------
-function dosesGivenToday(med, horario){
-  const t = todayStr();
+function dosesGivenOnDate(med, horario, dateStr){
+  const t = dateStr || todayStr();
   const medId = typeof med==='object' ? med.id : med;
   const medName = typeof med==='object' ? med.name : null;
   return entries.filter(e=> e.category==='remedio' && isSameDay(e.date, t) &&
     (e.medId===medId || (!e.medId && medName && e.title && normalizeSearch(e.title)===normalizeSearch(medName))) &&
     (horario===undefined || (e.horarioSlot||'')===horario));
 }
+function dosesGivenToday(med, horario){ return dosesGivenOnDate(med, horario, todayStr()); }
 
-// Cada remédio ativo hoje (contínuo/pontual) vira 1 "slot" por horário
-// cadastrado, já que agora um remédio pode ter vários horários no dia.
-function pendingSlotsForToday(){
-  const active = meds.filter(isMedActiveToday);
+// Cada remédio ativo num dia (contínuo/pontual) vira 1 "slot" por horário
+// cadastrado, já que agora um remédio pode ter vários horários no dia. Usada
+// tanto pro checklist de hoje quanto pra reconstruir o que era esperado num
+// dia passado (ver pastMedGroupHtml).
+function pendingSlotsForDate(dateStr){
+  const active = meds.filter(m=> isMedActiveOnDate(m, dateStr));
   const slots = [];
   for(const m of active){
     const horarios = (m.horarios && m.horarios.length>0) ? m.horarios : [{time:'', dose:m.dose||''}];
@@ -652,39 +656,73 @@ function pendingSlotsForToday(){
   }
   return slots;
 }
+function pendingSlotsForToday(){ return pendingSlotsForDate(todayStr()); }
 
 function onDemandMeds(){
   return meds.filter(m=> m.tipo==='sob-demanda');
 }
 
-// Agrupamento de remédios pra dias que não são hoje: mesma linguagem visual do
-// checklist de hoje, mas somente leitura (sem caixinha de marcar/desmarcar,
-// já que é histórico) e recolhido por padrão, com estado próprio por dia.
-function pastMedGroupHtml(dayKey, remedioEntries, forceOpen){
-  if(remedioEntries.length===0) return '';
+// Agrupamento de remédios pra dias que não são hoje: reconstrói o que era
+// esperado naquele dia (a partir do cadastro atual dos remédios, igual ao
+// checklist de hoje) e cruza com o que foi de fato lançado. Slot com
+// lançamento correspondente = check verde; slot sem lançamento = check
+// vazio, mas tocável, pra marcar retroativamente. Lançamentos que não batem
+// com nenhum slot esperado (remédio já apagado do cadastro, etc.) continuam
+// aparecendo soltos, como sempre apareceram, só que sem like de "esperado".
+function pastMedGroupHtml(dayKey, dateStr, remedioEntries, forceOpen){
+  const slots = pendingSlotsForDate(dateStr);
+  if(slots.length===0 && remedioEntries.length===0) return '';
   const isOpen = forceOpen || expandedMedGroups.has(dayKey);
+
+  const usedEntryIds = new Set();
+  const slotRows = slots.map(s=>{
+    const match = remedioEntries.find(e=> !usedEntryIds.has(e.id) &&
+      ((e.medId && e.medId===s.med.id) || (!e.medId && e.title && normalizeSearch(e.title)===normalizeSearch(s.med.name))) &&
+      (e.horarioSlot||'')===(s.horario||''));
+    if(match) usedEntryIds.add(match.id);
+    return { med:s.med, horario:s.horario, dose:s.dose, entry:match||null };
+  });
+  const adHoc = remedioEntries.filter(e=> !usedEntryIds.has(e.id));
+
+  const givenCount = slotRows.filter(r=>r.entry).length + adHoc.length;
+  const totalCount = slotRows.length + adHoc.length;
+  if(totalCount===0) return '';
+
   const header = `<button class="entry-row" data-medgroup-toggle="${esc(dayKey)}" style="${isOpen?'border-bottom:none; padding-bottom:6px':''}">
     <div class="entry-top">
       <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>Remédios</span></div>
-      <span style="display:flex; align-items:center; gap:4px; color:var(--ink-muted); font-size:.72rem; font-weight:600">${remedioEntries.length}${icon(isOpen?'chevronUp':'chevronDown',14,'var(--ink-muted)')}</span>
+      <span style="display:flex; align-items:center; gap:4px; color:var(--ink-muted); font-size:.72rem; font-weight:600">${givenCount}/${totalCount}${icon(isOpen?'chevronUp':'chevronDown',14,'var(--ink-muted)')}</span>
     </div>
   </button>`;
   if(!isOpen) return header;
-  const sorted = remedioEntries.slice().sort((a,b)=> fmtTime(a.date).localeCompare(fmtTime(b.date)));
-  const rows = sorted.map((e, idx)=>{
-    // Tenta achar o remédio ainda cadastrado, pra mostrar "Contínuo"/"Até
-    // tal data" igual o checklist de hoje mostra — mesmo padrão nos dois.
-    const med = e.medId ? meds.find(m=>m.id===e.medId) : meds.find(m=> normalizeSearch(m.name)===normalizeSearch(e.title||''));
-    const tipoLabel = med ? (med.tipo==='continuo' ? 'Contínuo' : med.tipo==='sob-demanda' ? 'Sob demanda' : `Até ${fmtDateShort(med.dataFim)}`) : '';
-    const sub = [tipoLabel, fmtTime(e.date), e.note].filter(Boolean).join(' · ');
-    return `<div class="entry-row" style="display:flex; align-items:center; gap:8px; cursor:default; padding:10px 0; ${idx===sorted.length-1?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)'}">
-      <button data-id="${e.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
+
+  const slotRowsHtml = slotRows.map(r=>{
+    const m = r.med;
+    const given = !!r.entry;
+    const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${r.horario?' · '+r.horario:''}${(given?r.entry.note:r.dose)?' · '+esc(given?r.entry.note:r.dose):''}`;
+    const inner = `<button data-med-edit="${m.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
+        <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
+        <div class="entry-sub">${sub}</div>
+      </button>
+      <button data-med="${m.id}" data-horario="${esc(r.horario)}" data-med-date="${esc(dateStr)}" aria-label="${given?'Dado, toque pra desfazer':'Marcar como dado'}" style="background:none; border:none; padding:6px; margin:0 -6px 0 0; cursor:pointer; flex-shrink:0">
+        <span class="pending-checkbox" style="${given?`background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}`:''}">${given?icon('check',11,'#fff'):''}</span>
+      </button>`;
+    return { sortKey: r.horario||'99:99', inner };
+  });
+
+  const adHocRowsHtml = adHoc.map(e=>{
+    const sub = [fmtTime(e.date), e.note].filter(Boolean).join(' · ');
+    const inner = `<button data-id="${e.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(e.title)}</span></div>
         <div class="entry-sub">${sub}</div>
       </button>
-      <span class="pending-checkbox" style="background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}; flex-shrink:0">${icon('check',11,'#fff')}</span>
-    </div>`;
-  }).join('');
+      <span class="pending-checkbox" style="background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}; flex-shrink:0">${icon('check',11,'#fff')}</span>`;
+    return { sortKey: fmtTime(e.date), inner };
+  });
+
+  const allRows = [...slotRowsHtml, ...adHocRowsHtml].sort((a,b)=> a.sortKey.localeCompare(b.sortKey));
+  const rows = allRows.map((row, idx)=> `<div class="entry-row" style="display:flex; align-items:center; gap:8px; cursor:default; padding:10px 0; ${idx===allRows.length-1?'border-bottom:none':'border-bottom:1px solid rgba(0,0,0,.04)'}">${row.inner}</div>`).join('');
+
   return `${header}<div style="background:${CATEGORIES.remedio.hex}0F; border-radius:12px; padding:0 10px; margin-bottom:8px">${rows}</div>`;
 }
 
@@ -735,28 +773,34 @@ function pendingRowsHtml(activeSlots, adHocEntries){
 }
 
 let medToggleLock = false;
-function toggleMedToday(medId, horario){
+// dateStr é o dia (YYYY-MM-DD) em que a dose deve ser lançada — 'hoje' quando
+// vem do checklist do dia corrente, ou o dia específico quando vem do
+// checklist de um dia passado (marcação retroativa).
+function toggleMedOnDate(medId, horario, dateStr){
   if(medToggleLock) return;
   medToggleLock = true;
   setTimeout(()=>{ medToggleLock = false; }, 500);
   const med = meds.find(m=>m.id===medId);
   if(!med) return;
-  const givenToday = dosesGivenToday(med, horario);
-  if(givenToday.length > 0){
-    // undo: remove today's dose(s) logged para esse remedio+horario
-    const idsToRemove = new Set(givenToday.map(e=>e.id));
+  const t = dateStr || todayStr();
+  const givenOnDate = dosesGivenOnDate(med, horario, t);
+  if(givenOnDate.length > 0){
+    // undo: remove o(s) lançamento(s) daquele dia pra esse remedio+horario
+    const idsToRemove = new Set(givenOnDate.map(e=>e.id));
     entries = entries.filter(e=> !idsToRemove.has(e.id));
   } else {
-    let date = new Date();
+    const [y,mo,da] = t.split('-').map(Number);
+    let date = new Date(y, mo-1, da);
     const slot = (med.horarios||[]).find(h=> h.time===horario);
     const dose = slot ? slot.dose : med.dose;
-    if(horario){ const [h,m2] = horario.split(':').map(Number); date.setHours(h,m2,0,0); }
+    if(horario){ const [h,m2] = horario.split(':').map(Number); date.setHours(h,m2,0,0); } else { date.setHours(12,0,0,0); }
     entries.push({ id:genId(), category:'remedio', medId:med.id, horarioSlot:horario||'', title:med.name, note:dose||'', date:date.toISOString(), createdAt:Date.now() });
   }
   entries.sort((a,b)=> new Date(b.date)-new Date(a.date));
   persistEntries();
   renderAll();
 }
+function toggleMedToday(medId, horario){ toggleMedOnDate(medId, horario, todayStr()); }
 
 // ---------- render: filters ----------
 function renderFilters(){
@@ -894,10 +938,9 @@ function renderTimeline(){
         pendingHtml = pendingRowsHtml(activeSlotsToday, adHocMedEntriesToday);
       } else {
         const dayRemedioEntries = day.items.filter(e=> e.category==='remedio');
-        if(dayRemedioEntries.length>0){
-          day.items = day.items.filter(e=> e.category!=='remedio');
-          pendingHtml = pastMedGroupHtml(day.key, dayRemedioEntries, isSearching);
-        }
+        day.items = day.items.filter(e=> e.category!=='remedio');
+        const dayDateStr = toLocalDateStr(new Date(day.key));
+        pendingHtml = pastMedGroupHtml(day.key, dayDateStr, dayRemedioEntries, isSearching);
       }
       if(day.items.length===0 && !pendingHtml) continue;
       const dayNum = fmtDay(refDate);
@@ -924,7 +967,7 @@ function renderTimeline(){
   }
   host.innerHTML = html;
   host.querySelectorAll('[data-id]').forEach(b=> b.addEventListener('click', ()=> openEntryModal(null, b.dataset.id)));
-  host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedToday(b.dataset.med, b.dataset.horario)));
+  host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedOnDate(b.dataset.med, b.dataset.horario, b.dataset.medDate || todayStr())));
   host.querySelectorAll('[data-med-edit]').forEach(b=> b.addEventListener('click', ()=> openMedManager(()=> renderAll(), b.dataset.medEdit)));
   host.querySelectorAll('[data-daysquare]').forEach(b=> b.addEventListener('click', ()=>{
     const key = b.dataset.daysquare;
