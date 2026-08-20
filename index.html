@@ -2035,10 +2035,54 @@ function openMedManager(onDone, jumpToId, startAdding){
     if(el) el.style.display = adding ? 'none' : '';
   }
 
+  // Se tiver hora/dose digitada mas ainda não comprometida na lista (ex: dose
+  // ainda com foco quando a pessoa aperta Adicionar/Pronto direto), garante
+  // que não fica perdida.
+  function flushPendingHorario(){
+    const t = document.getElementById('d_horario_new');
+    if(!t) return;
+    const v = t.value;
+    if(!v) return;
+    const doseEl = document.getElementById('d_horario_dose');
+    const doseVal = ((doseEl && doseEl.value) || '').trim();
+    if(draft.horarios.some(h=>h.time===v)){
+      draft.horarios = draft.horarios.map(h=> h.time===v ? {time:v, dose:doseVal} : h);
+    } else {
+      draft.horarios.push({time:v, dose:doseVal});
+    }
+    draft.horarios.sort((a,b)=> a.time.localeCompare(b.time));
+  }
+
+  // Usado tanto pelo botão Adicionar/Salvar quanto pelo Pronto, pra Pronto
+  // nunca descartar silenciosamente um remédio ainda não salvo.
+  function saveDraft(){
+    const n = draft.name.trim();
+    if(!n) return true; // nada preenchido, nada a salvar
+    const duplicate = list.some(m=> normalizeSearch(m.name)===normalizeSearch(n) && m.id!==editingId);
+    if(duplicate){
+      showWarning(`Já existe "${n}" cadastrado. Edite ele pra ajustar os horários, em vez de criar de novo.`);
+      return false;
+    }
+    const payload = {
+      name:n, tipo:draft.tipo,
+      dataInicio: draft.tipo==='pontual'?draft.dataInicio:'',
+      dataFim: draft.tipo==='pontual'?draft.dataFim:'',
+      dose: draft.tipo==='sob-demanda' ? draft.dose.trim() : '',
+      horarios: (draft.tipo==='continuo'||draft.tipo==='pontual') ? draft.horarios.map(h=>({...h})) : []
+    };
+    if(editingId){
+      list = list.map(m=> m.id===editingId ? { ...m, ...payload } : m);
+    } else {
+      list.push({ id:genId(), ...payload });
+    }
+    adding=false; editingId=null;
+    return true;
+  }
+
   function renderAddArea(){
     const area = document.getElementById('addArea');
     if(!adding){
-      area.innerHTML = `<button class="add-trigger" id="startAdd" style="margin-bottom:14px">${icon('plus',15)} Cadastrar remédio</button>`;
+      area.innerHTML = `<button type="button" class="link-btn" id="startAdd" style="color:${CATEGORIES.remedio.hex}; margin-bottom:14px">+ Cadastrar remédio</button>`;
       document.getElementById('startAdd').addEventListener('click', ()=>{ adding=true; editingId=null; confirmingDeleteId=null; draft={name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[], newHorarioTime:'', newHorarioDose:''}; syncMedListVisibility(); renderAddArea(); });
       return;
     }
@@ -2100,20 +2144,8 @@ function openMedManager(onDone, jumpToId, startAdding){
     const doseInput = document.getElementById('d_dose');
     if(doseInput) doseInput.addEventListener('input', e=> draft.dose=e.target.value);
     if(isScheduled){
-      function commitHorarioFromInputs(){
-        const v = document.getElementById('d_horario_new').value;
-        if(!v) return;
-        const doseVal = (document.getElementById('d_horario_dose').value || '').trim();
-        if(draft.horarios.some(h=>h.time===v)){
-          draft.horarios = draft.horarios.map(h=> h.time===v ? {time:v, dose:doseVal} : h);
-        } else {
-          draft.horarios.push({time:v, dose:doseVal});
-        }
-        draft.horarios.sort((a,b)=> a.time.localeCompare(b.time));
-        renderAddArea();
-      }
-      wireDtField('d_horario_new', v=>{ if(v) commitHorarioFromInputs(); });
-      document.getElementById('d_horario_dose').addEventListener('blur', ()=> commitHorarioFromInputs());
+      wireDtField('d_horario_new', v=>{ if(v){ flushPendingHorario(); renderAddArea(); } });
+      document.getElementById('d_horario_dose').addEventListener('blur', ()=>{ flushPendingHorario(); renderAddArea(); });
       document.querySelectorAll('[data-rm-horario]').forEach(b=> b.addEventListener('click', ()=>{
         draft.horarios.splice(Number(b.dataset.rmHorario),1);
         renderAddArea();
@@ -2122,32 +2154,22 @@ function openMedManager(onDone, jumpToId, startAdding){
     document.getElementById('cancelAdd').addEventListener('click', ()=>{ adding=false; editingId=null; confirmingDeleteId=null; syncMedListVisibility(); renderAddArea(); });
     document.getElementById('confirmAdd').addEventListener('click', ()=>{
       if(submitting) return;
-      const n = draft.name.trim(); if(!n) return;
-
-      const duplicate = list.some(m=> normalizeSearch(m.name)===normalizeSearch(n) && m.id!==editingId);
-      if(duplicate){
-        showWarning(`Já existe "${n}" cadastrado. Edite ele pra ajustar os horários, em vez de criar de novo.`);
-        return;
-      }
       submitting = true;
-      const payload = {
-        name:n, tipo:draft.tipo,
-        dataInicio: draft.tipo==='pontual'?draft.dataInicio:'',
-        dataFim: draft.tipo==='pontual'?draft.dataFim:'',
-        dose: draft.tipo==='sob-demanda' ? draft.dose.trim() : '',
-        horarios: (draft.tipo==='continuo'||draft.tipo==='pontual') ? draft.horarios.map(h=>({...h})) : []
-      };
-      if(editingId){
-        list = list.map(m=> m.id===editingId ? { ...m, ...payload } : m);
-      } else {
-        list.push({ id:genId(), ...payload });
-      }
-      adding=false; editingId=null;
+      flushPendingHorario();
+      const ok = saveDraft();
+      if(!ok){ submitting=false; return; }
       render();
     });
   }
 
-  function finish(){ meds=list; persistMeds(); closeModal(); renderTimeline(); if(onDone) onDone(); }
+  function finish(){
+    if(adding){
+      flushPendingHorario();
+      const ok = saveDraft();
+      if(!ok) return; // nome duplicado: mantém a pessoa na tela pra corrigir, não fecha
+    }
+    meds=list; persistMeds(); closeModal(); renderTimeline(); if(onDone) onDone();
+  }
   render();
 }
 
