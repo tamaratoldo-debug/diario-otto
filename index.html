@@ -296,7 +296,7 @@ function dtField(id, type, value, placeholder){
 function wireDtField(id, onChange){
   const input = document.getElementById(id);
   if(!input) return;
-  input.addEventListener('input', e=>{
+  input.addEventListener('change', e=>{
     const v = e.target.value;
     if(onChange) onChange(v);
     const disp = document.getElementById(id+'_display');
@@ -1964,12 +1964,14 @@ function openMedManager(onDone, jumpToId, startAdding){
   let draft = {name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[]};
   let submitting = false;
   let confirmingDeleteId = null;
+  let isNewDraft = false;
 
   if(jumpToId){
     const m = list.find(x=>x.id===jumpToId);
     if(m){
       editingId = m.id;
       adding = true;
+      isNewDraft = false;
       draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).map(h=>({...h})) };
     }
   } else if(startAdding){
@@ -2010,6 +2012,7 @@ function openMedManager(onDone, jumpToId, startAdding){
       if(!m) return;
       editingId = m.id;
       adding = true;
+      isNewDraft = false;
       confirmingDeleteId = m.id;
       draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).map(h=>({...h})) };
       syncMedListVisibility();
@@ -2021,6 +2024,7 @@ function openMedManager(onDone, jumpToId, startAdding){
       if(!m) return;
       editingId = m.id;
       adding = true;
+      isNewDraft = false;
       confirmingDeleteId = null;
       draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).map(h=>({...h})) };
       syncMedListVisibility();
@@ -2053,15 +2057,24 @@ function openMedManager(onDone, jumpToId, startAdding){
     draft.horarios.sort((a,b)=> a.time.localeCompare(b.time));
   }
 
-  // Usado tanto pelo botão Adicionar/Salvar quanto pelo Pronto, pra Pronto
-  // nunca descartar silenciosamente um remédio ainda não salvo.
-  function saveDraft(){
+  // Salva ao vivo: toda mudança em qualquer campo já reflete na lista. Sem
+  // nome ainda não existe remédio de fato, então não cria nada até ter nome;
+  // se o nome for apagado de novo, remove o rascunho fantasma.
+  function syncDraftToList(){
     const n = draft.name.trim();
-    if(!n) return true; // nada preenchido, nada a salvar
-    const duplicate = list.some(m=> normalizeSearch(m.name)===normalizeSearch(n) && m.id!==editingId);
-    if(duplicate){
-      showWarning(`Já existe "${n}" cadastrado. Edite ele pra ajustar os horários, em vez de criar de novo.`);
-      return false;
+    if(!editingId){
+      if(!n) return;
+      editingId = genId();
+      isNewDraft = true;
+      list.push({ id: editingId, name:'', tipo:draft.tipo, dataInicio:'', dataFim:'', dose:'', horarios:[] });
+    }
+    if(!n){
+      if(isNewDraft){
+        list = list.filter(m=> m.id!==editingId);
+        editingId = null;
+      }
+      // remédio já existente: não apaga, só não atualiza até ter um nome de novo
+      return;
     }
     const payload = {
       name:n, tipo:draft.tipo,
@@ -2070,25 +2083,26 @@ function openMedManager(onDone, jumpToId, startAdding){
       dose: draft.tipo==='sob-demanda' ? draft.dose.trim() : '',
       horarios: (draft.tipo==='continuo'||draft.tipo==='pontual') ? draft.horarios.map(h=>({...h})) : []
     };
-    if(editingId){
-      list = list.map(m=> m.id===editingId ? { ...m, ...payload } : m);
-    } else {
-      list.push({ id:genId(), ...payload });
-    }
-    adding=false; editingId=null;
-    return true;
+    list = list.map(m=> m.id===editingId ? { ...m, ...payload } : m);
   }
 
   function renderAddArea(){
     const area = document.getElementById('addArea');
     if(!adding){
       area.innerHTML = `<button type="button" class="link-btn" id="startAdd" style="color:${CATEGORIES.remedio.hex}; margin-bottom:14px">+ Cadastrar remédio</button>`;
-      document.getElementById('startAdd').addEventListener('click', ()=>{ adding=true; editingId=null; confirmingDeleteId=null; draft={name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[], newHorarioTime:'', newHorarioDose:''}; syncMedListVisibility(); renderAddArea(); });
+      document.getElementById('startAdd').addEventListener('click', ()=>{
+        adding=true; editingId=null; confirmingDeleteId=null;
+        draft={name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[]};
+        syncMedListVisibility(); renderAddArea();
+      });
       return;
     }
     const isScheduled = draft.tipo==='continuo' || draft.tipo==='pontual';
     area.innerHTML = `<div class="add-form">
-      ${editingId? `<div class="hint" style="margin-bottom:8px; font-weight:600; color:${CATEGORIES.remedio.hex}">Editando</div>` : ''}
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px">
+        <button type="button" id="backToList" style="background:none; border:none; padding:0; font-family:inherit; font-size:.82rem; color:var(--ink-muted); cursor:pointer">‹ Remédios</button>
+        ${editingId? `<button type="button" id="deleteMedBtn" style="background:none; border:none; padding:4px; display:flex; color:#B3261E; cursor:pointer">${icon('trash',16,'#B3261E')}</button>` : ''}
+      </div>
       <div class="field"><label>Nome do remédio</label><input id="d_name" autocomplete="off" value="${esc(draft.name)}" placeholder="ex: Omeprazol"/></div>
       <div class="field"><label>Tipo</label><div class="tipo-toggle">
         <button data-tipo="continuo" class="${draft.tipo==='continuo'?'sel':''}">Contínuo</button>
@@ -2112,8 +2126,9 @@ function openMedManager(onDone, jumpToId, startAdding){
           <div style="flex:1"><input id="d_horario_dose" autocomplete="off" placeholder="dose (opcional)" style="width:100%; padding:11px 12px; border-radius:10px; border:1px solid #E5E0D4; font-family:inherit; font-size:.9rem; box-sizing:border-box"/></div>
         </div>
       </div>` : ''}
+      ${nameConflict()? `<div class="hint" style="color:#B3261E; margin-top:-6px">Já existe um remédio chamado "${esc(draft.name.trim())}".</div>` : ''}
       ${editingId && confirmingDeleteId===editingId? `
-        <div style="background:#FBEAE9; border-radius:10px; padding:10px 12px; margin-top:4px; display:flex; align-items:center; justify-content:space-between; gap:8px">
+        <div style="background:#FBEAE9; border-radius:10px; padding:10px 12px; margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:8px">
           <span style="font-size:.82rem; color:#B3261E">Excluir "${esc(draft.name)}"?</span>
           <div style="display:flex; gap:6px; flex-shrink:0">
             <button type="button" id="cancelDeleteMedBtn" style="background:none; border:none; padding:5px 8px; font-family:inherit; font-size:.78rem; color:var(--ink-muted); cursor:pointer">Cancelar</button>
@@ -2121,13 +2136,9 @@ function openMedManager(onDone, jumpToId, startAdding){
           </div>
         </div>
       ` : ''}
-      <div style="display:flex; gap:8px; margin-top:12px">
-        ${editingId? `<button type="button" class="btn-secondary" id="deleteMedBtn" style="color:#B3261E; padding:0 14px">${icon('trash',16,'#B3261E')}</button>` : ''}
-        <button class="btn-secondary" id="cancelAdd" style="flex:1">Cancelar</button>
-        <button class="btn-primary" id="confirmAdd" ${draft.name.trim()?'':'disabled'}>${editingId?'Salvar':'Adicionar'}</button>
-      </div>
     </div>`;
-    document.getElementById('d_name').addEventListener('input', e=>{ draft.name=e.target.value; document.getElementById('confirmAdd').disabled = !draft.name.trim(); });
+    document.getElementById('backToList').addEventListener('click', ()=>{ adding=false; confirmingDeleteId=null; syncMedListVisibility(); render(); });
+    document.getElementById('d_name').addEventListener('input', e=>{ draft.name=e.target.value; syncDraftToList(); refreshInlineOnly(); });
     const deleteBtn = document.getElementById('deleteMedBtn');
     if(deleteBtn) deleteBtn.addEventListener('click', ()=>{ confirmingDeleteId = editingId; renderAddArea(); });
     const cancelDeleteBtn = document.getElementById('cancelDeleteMedBtn');
@@ -2138,35 +2149,41 @@ function openMedManager(onDone, jumpToId, startAdding){
       adding=false; editingId=null; confirmingDeleteId=null;
       render();
     });
-    document.querySelectorAll('[data-tipo]').forEach(b=> b.addEventListener('click', ()=>{ draft.tipo=b.dataset.tipo; renderAddArea(); }));
-    wireDtField('d_inicio', v=> draft.dataInicio=v);
-    wireDtField('d_fim', v=> draft.dataFim=v);
+    document.querySelectorAll('[data-tipo]').forEach(b=> b.addEventListener('click', ()=>{ draft.tipo=b.dataset.tipo; syncDraftToList(); renderAddArea(); }));
+    wireDtField('d_inicio', v=>{ draft.dataInicio=v; syncDraftToList(); });
+    wireDtField('d_fim', v=>{ draft.dataFim=v; syncDraftToList(); });
     const doseInput = document.getElementById('d_dose');
-    if(doseInput) doseInput.addEventListener('input', e=> draft.dose=e.target.value);
+    if(doseInput) doseInput.addEventListener('input', e=>{ draft.dose=e.target.value; syncDraftToList(); });
     if(isScheduled){
-      wireDtField('d_horario_new', v=>{ if(v){ flushPendingHorario(); renderAddArea(); } });
-      document.getElementById('d_horario_dose').addEventListener('blur', ()=>{ flushPendingHorario(); renderAddArea(); });
+      wireDtField('d_horario_new', v=>{ if(v){ flushPendingHorario(); syncDraftToList(); renderAddArea(); } });
+      document.getElementById('d_horario_dose').addEventListener('blur', ()=>{ flushPendingHorario(); syncDraftToList(); renderAddArea(); });
       document.querySelectorAll('[data-rm-horario]').forEach(b=> b.addEventListener('click', ()=>{
         draft.horarios.splice(Number(b.dataset.rmHorario),1);
+        syncDraftToList();
         renderAddArea();
       }));
     }
-    document.getElementById('cancelAdd').addEventListener('click', ()=>{ adding=false; editingId=null; confirmingDeleteId=null; syncMedListVisibility(); renderAddArea(); });
-    document.getElementById('confirmAdd').addEventListener('click', ()=>{
-      if(submitting) return;
-      submitting = true;
-      flushPendingHorario();
-      const ok = saveDraft();
-      if(!ok){ submitting=false; return; }
-      render();
-    });
+  }
+
+  // Atualiza só o texto de conflito de nome sem re-renderizar o campo (que
+  // perderia o foco/cursor a cada letra digitada).
+  function refreshInlineOnly(){
+    const area = document.getElementById('addArea');
+    const existingWarn = area.querySelector('.hint[style*="B3261E"]');
+    const shouldWarn = nameConflict();
+    if(shouldWarn && !existingWarn){ renderAddArea(); return; }
+    if(!shouldWarn && existingWarn){ renderAddArea(); }
+  }
+  function nameConflict(){
+    const n = draft.name.trim();
+    if(!n) return false;
+    return list.some(m=> normalizeSearch(m.name)===normalizeSearch(n) && m.id!==editingId);
   }
 
   function finish(){
     if(adding){
       flushPendingHorario();
-      const ok = saveDraft();
-      if(!ok) return; // nome duplicado: mantém a pessoa na tela pra corrigir, não fecha
+      syncDraftToList();
     }
     meds=list; persistMeds(); closeModal(); renderTimeline(); if(onDone) onDone();
   }
