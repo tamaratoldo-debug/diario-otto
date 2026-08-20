@@ -19,6 +19,7 @@
     --c-consulta:#7B61E0; --c-consulta-bg:#ECE7FB;
     --c-procedimento:#D9569B; --c-procedimento-bg:#FBE5F0;
     --c-exame:#6B7A99; --c-exame-bg:#E9ECF2;
+    --c-creche:#A97C50; --c-creche-bg:#F2E8DC;
   }
   *,*::before,*::after{box-sizing:border-box}
   html,body{overflow-x:hidden; margin:0; padding:0}
@@ -152,6 +153,10 @@
   .btn-secondary{padding:13px 16px; border-radius:12px; border:none; background:#F1EEE6; color:var(--ink); font-weight:600; font-size:.9rem; cursor:pointer; font-family:inherit}
   .btn-danger{flex:1; padding:11px; border-radius:10px; border:none; background:#A8473A; color:#fff; font-weight:600; font-size:.85rem; cursor:pointer; font-family:inherit}
   .hint{font-size:.68rem; color:var(--ink-muted); margin-top:4px}
+  .creche-grid{display:grid; grid-template-columns:repeat(2, 1fr); gap:10px}
+  .creche-svc-btn{background:#FBFAF7; border:1px solid #F1EEE6; border-radius:14px; padding:16px 10px; text-align:center; cursor:pointer; font-family:inherit}
+  .creche-svc-btn .nome{font-size:.95rem; font-weight:600; color:var(--ink)}
+  .creche-svc-btn .valor{font-size:.78rem; color:var(--ink-muted); margin-top:3px}
   .manager-item{display:flex; align-items:center; justify-content:space-between; background:#FBFAF7; border-radius:10px; padding:10px 12px; margin-bottom:6px}
   .manager-item .name{font-size:.88rem; font-weight:500}
   .manager-item .sub{font-size:.68rem; color:var(--ink-muted)}
@@ -220,7 +225,8 @@ const CATEGORIES = {
   intercorrencia:{label:'Intercorrência', short:'Intercorrência', color:'var(--c-intercorrencia)', hex:'#E0604A', bgHex:'#FBE6E1', icon:'alert'},
   consulta:{label:'Consulta', short:'Consulta', color:'var(--c-consulta)', hex:'#7B61E0', bgHex:'#ECE7FB', icon:'stethoscope'},
   procedimento:{label:'Procedimento', short:'Procedimento', color:'var(--c-procedimento)', hex:'#D9569B', bgHex:'#FBE5F0', icon:'syringe'},
-  exame:{label:'Exame', short:'Exame', color:'var(--c-exame)', hex:'#6B7A99', bgHex:'#E9ECF2', icon:'flask'}
+  exame:{label:'Exame', short:'Exame', color:'var(--c-exame)', hex:'#6B7A99', bgHex:'#E9ECF2', icon:'flask'},
+  creche:{label:'Creche', short:'Creche', color:'var(--c-creche)', hex:'#A97C50', bgHex:'#F2E8DC', icon:'home'}
 };
 const CATEGORY_ORDER = ['alimentacao','remedio','peso','intercorrencia','consulta','procedimento','exame'];
 const COMO_COMEU = [
@@ -376,6 +382,17 @@ function resizeImageFile(file, maxDim=1600, quality=0.85){
 let entries = store.get('otto:entries', []);
 let foods = store.get('otto:foods', []);
 let meds = store.get('otto:meds', []);
+let crecheServicos = store.get('otto:creche-servicos', null);
+if(!crecheServicos){
+  crecheServicos = [
+    {id:'creche', nome:'Creche', valor:30},
+    {id:'hotel', nome:'Hotel', valor:70},
+    {id:'banho', nome:'Banho', valor:90}
+  ];
+  store.set('otto:creche-servicos', crecheServicos);
+}
+let crecheLancamentos = store.get('otto:creche-lancamentos', []);
+let crecheFechados = store.get('otto:creche-fechados', {});
 // Migração: remédios antigos tinham 1 horário só (campo "horario"). Agora tem
 // uma lista de horários ("horarios"), e existe um terceiro tipo "sob-demanda"
 // (remédio salvo mas sem horário fixo, tipo "dou se precisar").
@@ -545,6 +562,9 @@ async function loadProfilePhoto(){
 function persistEntries(){ return writeStore('otto:entries', entries); }
 function persistFoods(){ return writeStore('otto:foods', foods); }
 function persistMeds(){ return writeStore('otto:meds', meds); }
+function persistCrecheServicos(){ return writeStore('otto:creche-servicos', crecheServicos); }
+function persistCrecheLancamentos(){ return writeStore('otto:creche-lancamentos', crecheLancamentos); }
+function persistCrecheFechados(){ return writeStore('otto:creche-fechados', crecheFechados); }
 function persistChips(k){ return writeStore('otto:'+k+'-chips', chips[k]); }
 function persistSettings(){ return writeStore('otto:settings', settings); }
 function writeStore(key, value){
@@ -622,14 +642,7 @@ function renderQuickActions(){
   host.innerHTML = catButtons + crecheButton;
   host.querySelectorAll('[data-cat]').forEach(b=> b.addEventListener('click', ()=> openEntryModal(b.dataset.cat)));
   const crecheBtn = host.querySelector('[data-action="creche"]');
-  if(crecheBtn) crecheBtn.addEventListener('click', ()=>{
-    if(settings.crecheLink){
-      window.open(settings.crecheLink, '_blank');
-    } else {
-      showWarning('Adicione o link da creche em Configurações primeiro.');
-      openSettings();
-    }
-  });
+  if(crecheBtn) crecheBtn.addEventListener('click', ()=> openCrecheModal());
 }
 
 // ---------- pending meds (rendered inline inside today's day-card) ----------
@@ -1171,6 +1184,10 @@ function emptyForm(cat){
 function openEntryModal(category, editId){
   let editing = null;
   if(editId){ editing = entries.find(e=>e.id===editId); category = editing.category; }
+  if(editing && editing.category==='creche'){
+    const lanc = crecheLancamentos.find(l=> l.id===editing.crecheId);
+    if(lanc){ openCrecheLancamentoForm(lanc.servicoId, lanc); return; }
+  }
   let form = editing ? {
     title: editing.title||'', quantidade: editing.quantidade||'',
     dateD: toLocalDateStr(new Date(editing.date)), dateT: fmtTime(editing.date),
@@ -1614,6 +1631,171 @@ function openEntryModal(category, editId){
 }
 
 function closeModal(){ document.getElementById('modalHost').innerHTML=''; }
+
+// ---------- creche/banho/hotel ----------
+function monthKeyOf(dateStr){ return (dateStr||todayStr()).slice(0,7); }
+function isMonthFechado(dateStr){ return !!crecheFechados[monthKeyOf(dateStr)]; }
+function parseValorBR(s){
+  if(s==null || s==='') return 0;
+  const n = parseFloat(String(s).replace(/\./g,'').replace(',', '.'));
+  return isNaN(n) ? 0 : n;
+}
+function fmtValorBR(n){
+  return (Number(n)||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function diffDias(dataStr, dataSaidaStr){
+  if(!dataStr || !dataSaidaStr) return 0;
+  const a = new Date(dataStr+'T00:00:00'), b = new Date(dataSaidaStr+'T00:00:00');
+  const d = Math.round((b-a)/86400000);
+  return d>0 ? d : 0;
+}
+
+function openCrecheModal(){
+  const host = document.getElementById('modalHost');
+  function render(){
+    const cat = CATEGORIES.creche;
+    const cards = crecheServicos.map(s=> `<button class="creche-svc-btn" data-svc="${s.id}">
+        <div class="nome">${esc(s.nome)}</div>
+        <div class="valor">R$ ${fmtValorBR(s.valor)}${s.id==='hotel'?'/dia':''}</div>
+      </button>`).join('');
+    host.innerHTML = `<div class="overlay" id="ovCreche">
+      <div class="sheet" style="max-height:90vh">
+        <div class="sheet-head"><div class="sheet-title" style="display:flex; align-items:center; gap:8px"><span style="color:${cat.hex}; display:flex">${icon('home',18,cat.hex)}</span>Creche</div></div>
+        <div class="sheet-body">
+          <div class="creche-grid">
+            ${cards}
+            <button class="creche-svc-btn" data-svc="outro" style="background:${cat.bgHex}; color:${cat.hex}">
+              <div class="nome" style="color:${cat.hex}">${icon('plus',18,cat.hex)}</div>
+              <div class="valor" style="color:${cat.hex}">Outro</div>
+            </button>
+          </div>
+        </div>
+        <div class="sheet-foot"><button class="btn-secondary" id="closeCrecheBtn" style="flex:1">Fechar</button></div>
+      </div>
+    </div>`;
+    document.getElementById('ovCreche').addEventListener('click', e=>{ if(e.target.id==='ovCreche') closeModal(); });
+    document.getElementById('closeCrecheBtn').addEventListener('click', closeModal);
+    host.querySelectorAll('.creche-svc-btn').forEach(b=> b.addEventListener('click', ()=> openCrecheLancamentoForm(b.dataset.svc)));
+  }
+  render();
+}
+
+// svcId: 'creche'|'hotel'|'banho'|'outro'. lanc: lançamento existente (edição) ou null (novo).
+function openCrecheLancamentoForm(svcId, lanc){
+  const host = document.getElementById('modalHost');
+  const servico = crecheServicos.find(s=>s.id===svcId) || null;
+  const isHotel = svcId==='hotel';
+  const isOutro = svcId==='outro' || !servico;
+  const cat = CATEGORIES.creche;
+  let confirmingDelete = false;
+  let submitting = false;
+  const form = lanc ? {
+    nome: lanc.servicoNome, valor: fmtValorBR(lanc.valor),
+    data: lanc.data, dataSaida: lanc.dataSaida||'', obs: lanc.obs||''
+  } : {
+    nome: isOutro ? '' : servico.nome, valor: isOutro ? '' : fmtValorBR(servico.valor),
+    data: todayStr(), dataSaida: '', obs: ''
+  };
+  const fechado = isMonthFechado(form.data);
+
+  function recalcHotelValor(){
+    if(!isHotel || !servico) return;
+    const dias = diffDias(form.data, form.dataSaida);
+    if(dias>0) form.valor = fmtValorBR(dias*servico.valor);
+  }
+  if(isHotel && !lanc) recalcHotelValor();
+
+  function canSave(){ return form.nome.trim()!=='' && form.data!==''; }
+
+  function render(){
+    submitting = false;
+    host.innerHTML = `<div class="overlay" id="ovCrLanc">
+      <div class="sheet">
+        <div class="sheet-head">
+          <div class="sheet-title" style="display:flex; align-items:center; gap:8px"><span style="color:${cat.hex}; display:flex">${icon('home',18,cat.hex)}</span>${lanc?'Editar lançamento':form.nome||'Novo lançamento'}</div>
+        </div>
+        <div class="sheet-body">
+          ${fechado?`<div class="hint" style="margin-bottom:12px">Este mês já está fechado. Reabra o mês em Gerenciar para editar.</div>`:''}
+          ${isOutro?`<div class="field"><label>Serviço</label><input type="text" id="f_nome" value="${esc(form.nome)}" ${fechado?'disabled':''}/></div>`:''}
+          <div class="field"${fechado?' style="pointer-events:none; opacity:.6"':''}><label>Data</label>${dtField('f_data','date',form.data)}</div>
+          ${isHotel?`<div class="field"${fechado?' style="pointer-events:none; opacity:.6"':''}><label>Data de saída</label>${dtField('f_saida','date',form.dataSaida)}</div>`:''}
+          <div class="field"><label>Valor (R$)</label><input type="text" inputmode="decimal" id="f_valor" value="${esc(form.valor)}" ${fechado?'disabled':''}/></div>
+          <div class="field"><label>Observações</label><input type="text" id="f_obs" value="${esc(form.obs)}" ${fechado?'disabled':''}/></div>
+          ${confirmingDelete?`<div class="hint" style="color:var(--c-intercorrencia); margin-top:6px">Apagar este lançamento? <button class="link-btn" id="confirmDelBtn" style="color:var(--c-intercorrencia)">Apagar</button> · <button class="link-btn" id="cancelDelBtn">Cancelar</button></div>`:''}
+        </div>
+        <div class="sheet-foot" style="gap:8px">
+          ${lanc && !fechado ? `<button class="btn-secondary" id="delLancBtn">${icon('trash',15,'var(--ink-muted)')}</button>` : ''}
+          <button class="btn-secondary" id="backCrLancBtn" style="flex:${lanc?'0':'1'}">${lanc?'Fechar':'Voltar'}</button>
+          ${!fechado?`<button class="btn-primary" id="saveCrLancBtn" ${canSave()?'':'disabled'}>Salvar</button>`:''}
+        </div>
+      </div>
+    </div>`;
+    document.getElementById('ovCrLanc').addEventListener('click', e=>{ if(e.target.id==='ovCrLanc') closeModal(); });
+    document.getElementById('backCrLancBtn').addEventListener('click', ()=> lanc? closeModal() : openCrecheModal());
+    if(isOutro){
+      wireInput('f_nome', v=>{ form.nome=v; });
+    }
+    wireDtField('f_data', v=>{ form.data=v; if(isHotel) recalcHotelValor(); render(); });
+    if(isHotel) wireDtField('f_saida', v=>{ form.dataSaida=v; recalcHotelValor(); render(); });
+    wireInput('f_valor', v=>{ form.valor=v; });
+    wireInput('f_obs', v=>{ form.obs=v; });
+    const saveBtn = document.getElementById('saveCrLancBtn');
+    if(saveBtn) saveBtn.addEventListener('click', save);
+    const delBtn = document.getElementById('delLancBtn');
+    if(delBtn) delBtn.addEventListener('click', ()=>{ confirmingDelete=true; render(); });
+    const confirmDelBtn = document.getElementById('confirmDelBtn');
+    if(confirmDelBtn) confirmDelBtn.addEventListener('click', doDelete);
+    const cancelDelBtn = document.getElementById('cancelDelBtn');
+    if(cancelDelBtn) cancelDelBtn.addEventListener('click', ()=>{ confirmingDelete=false; render(); });
+  }
+
+  function wireInput(id, onChange){
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.addEventListener('input', ()=>{ onChange(el.value); syncSaveBtn(); });
+  }
+  function syncSaveBtn(){
+    const b = document.getElementById('saveCrLancBtn');
+    if(b) b.disabled = !canSave();
+  }
+
+  function save(){
+    if(!canSave() || submitting) return;
+    submitting = true;
+    const valorNum = parseValorBR(form.valor);
+    if(lanc){
+      lanc.servicoNome = form.nome;
+      lanc.valor = valorNum;
+      lanc.data = form.data;
+      lanc.dataSaida = isHotel ? form.dataSaida : '';
+      lanc.obs = form.obs.trim();
+      persistCrecheLancamentos();
+      const entry = entries.find(e=> e.id===lanc.entryId);
+      if(entry){ entry.title = form.nome; entry.date = new Date(form.data+'T'+ (entry.date? new Date(entry.date).toTimeString().slice(0,8) : '12:00:00')).toISOString(); persistEntries(); }
+      closeModal(); renderAll(); showSuccess('Lançamento atualizado.');
+    } else {
+      const now = new Date();
+      const dateIso = new Date(form.data+'T'+now.toTimeString().slice(0,8)).toISOString();
+      const newLanc = { id:genId(), servicoId:svcId, servicoNome:form.nome, valor:valorNum, data:form.data, dataSaida: isHotel?form.dataSaida:'', obs:form.obs.trim(), entryId:null, createdAt:Date.now() };
+      const newEntry = { id:genId(), category:'creche', crecheId:newLanc.id, title:form.nome, note:'', date:dateIso, createdAt:Date.now() };
+      newLanc.entryId = newEntry.id;
+      crecheLancamentos.push(newLanc);
+      entries.push(newEntry);
+      persistCrecheLancamentos(); persistEntries();
+      closeModal(); renderAll(); showSuccess(form.nome+' lançado.');
+    }
+  }
+
+  function doDelete(){
+    if(!lanc) return;
+    crecheLancamentos = crecheLancamentos.filter(l=> l.id!==lanc.id);
+    entries = entries.filter(e=> e.id!==lanc.entryId);
+    persistCrecheLancamentos(); persistEntries();
+    closeModal(); renderAll(); showSuccess('Lançamento apagado.');
+  }
+
+  render();
+}
 
 function openConfirmDelete(id){
   const host = document.getElementById('modalHost');
