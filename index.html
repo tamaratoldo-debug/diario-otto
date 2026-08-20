@@ -1177,6 +1177,7 @@ function openEntryModal(category, editId){
   const host = document.getElementById('modalHost');
   const quickPick = category==='remedio' && !editing;
   let medQuickHorarioPick = null;
+  let medConcludedExpanded = false;
 
   function canSave(){
     if(category==='peso') return form.value!=='' && !isNaN(parseFloat(form.value));
@@ -1198,7 +1199,10 @@ function openEntryModal(category, editId){
     }
     if(category==='remedio'){
       if(quickPick){
-        const scheduled = meds.filter(m=> m.tipo!=='sob-demanda');
+        const t = todayStr();
+        const isConcluded = m=> m.tipo==='pontual' && m.dataFim && m.dataFim < t;
+        const scheduled = meds.filter(m=> m.tipo!=='sob-demanda' && !isConcluded(m));
+        const concluded = meds.filter(m=> isConcluded(m));
         const onDemand = meds.filter(m=> m.tipo==='sob-demanda');
         const cardHtml = m=>{
           let sub = m.tipo==='sob-demanda' ? (m.dose?esc(m.dose):'') : ((m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : (m.dose?esc(m.dose):''));
@@ -1228,7 +1232,10 @@ function openEntryModal(category, editId){
         h += `<div class="field">
           <button type="button" class="add-trigger" id="openMedMgr" style="margin-bottom:14px">${icon('plus',15)} Cadastrar remédio</button>
           ${scheduled.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Horário fixo</label><div class="pickgrid" id="medPickScheduled" style="justify-content:flex-start; margin-bottom:16px">${scheduled.map(cardHtml).join('')}</div>` : ''}
-          ${onDemand.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Sob demanda</label><div class="pickgrid" id="medPickOnDemand" style="justify-content:flex-start">${onDemand.map(cardHtml).join('')}</div>` : ''}
+          ${onDemand.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Sob demanda</label><div class="pickgrid" id="medPickOnDemand" style="justify-content:flex-start; ${concluded.length?'margin-bottom:16px':''}">${onDemand.map(cardHtml).join('')}</div>` : ''}
+          ${concluded.length? `<button type="button" id="toggleConcluded" style="display:flex; align-items:center; gap:4px; background:none; border:none; padding:0; font-family:inherit; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:${medConcludedExpanded?'6px':'0'}; cursor:pointer">
+            <span>Concluídos (${concluded.length})</span>${icon(medConcludedExpanded?'chevronUp':'chevronDown',13,'var(--ink-muted)')}
+          </button>${medConcludedExpanded? `<div class="pickgrid" id="medPickConcluded" style="justify-content:flex-start">${concluded.map(cardHtml).join('')}</div>` : ''}` : ''}
           ${meds.length===0? '<span class="hint">Nenhum remédio cadastrado ainda.</span>' : ''}
         </div>`;
       } else {
@@ -1364,6 +1371,8 @@ function openEntryModal(category, editId){
         closeModal();
       }));
       document.querySelectorAll('[data-quickcancel]').forEach(b=> b.addEventListener('click', ()=>{ medQuickHorarioPick=null; refreshBody(); }));
+      const toggleConcludedBtn1 = document.getElementById('toggleConcluded');
+      if(toggleConcludedBtn1) toggleConcludedBtn1.addEventListener('click', ()=>{ medConcludedExpanded = !medConcludedExpanded; refreshBody(); });
       document.querySelectorAll('[data-quickedit]').forEach(b=> b.addEventListener('click', ()=>{
         const id = b.dataset.quickedit;
         closeModal();
@@ -1486,6 +1495,8 @@ function openEntryModal(category, editId){
         closeModal();
       }));
       document.querySelectorAll('[data-quickcancel]').forEach(b=> b.addEventListener('click', ()=>{ medQuickHorarioPick=null; refreshBody(); }));
+      const toggleConcludedBtn2 = document.getElementById('toggleConcluded');
+      if(toggleConcludedBtn2) toggleConcludedBtn2.addEventListener('click', ()=>{ medConcludedExpanded = !medConcludedExpanded; refreshBody(); });
       document.querySelectorAll('[data-quickedit]').forEach(b=> b.addEventListener('click', ()=>{
         const id = b.dataset.quickedit;
         closeModal();
