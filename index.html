@@ -1224,10 +1224,11 @@ function openEntryModal(category, editId){
           </button>`;
         };
         const scheduledRowHtml = m=>{
+          const tipoLabel = m.tipo==='continuo' ? 'Contínuo' : `Até ${fmtDateShort(m.dataFim)}`;
           const horarios = (m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : (m.dose?esc(m.dose):'');
           return `<div class="med-pick-btn" style="display:block; width:100%; text-align:left; padding:9px 12px; opacity:.6">
               <div class="mp-name">${esc(m.name)}</div>
-              ${horarios?`<div class="mp-sub">${horarios}</div>`:''}
+              <div class="mp-sub">${tipoLabel}${horarios?' · '+horarios:''}</div>
           </div>`;
         };
         h += `<div class="field">
@@ -1997,7 +1998,7 @@ function openMedManager(onDone, jumpToId, startAdding){
     const itemHtml = m=> `<div class="manager-item" data-open="${m.id}" style="cursor:pointer"><div><div class="name">${esc(m.name)}</div><div class="sub">${medSubLabel(m)}</div></div><button class="del-btn" data-id="${m.id}">${icon('trash',14,'var(--ink-muted)')}</button></div>`;
     host.innerHTML = `<div class="overlay" id="ovMed">
       <div class="sheet" style="max-height:90vh">
-        <div class="sheet-head"><div class="sheet-title">Remédios atuais</div><button class="icon-btn" id="closeMed">${icon('x',18)}</button></div>
+        <div class="sheet-head"><div class="sheet-title">Remédios atuais</div></div>
         <div class="sheet-body">
           <div id="addArea"></div>
           <div id="medList" style="${adding?'display:none':''}">
@@ -2010,7 +2011,6 @@ function openMedManager(onDone, jumpToId, startAdding){
       </div>
     </div>`;
     document.getElementById('ovMed').addEventListener('click', e=>{ if(e.target.id==='ovMed') finish(); });
-    document.getElementById('closeMed').addEventListener('click', finish);
     document.getElementById('doneMedBtn').addEventListener('click', finish);
     document.querySelectorAll('#medList .del-btn').forEach(b=> b.addEventListener('click', (ev)=>{
       ev.stopPropagation();
@@ -2129,7 +2129,7 @@ function openMedManager(onDone, jumpToId, startAdding){
         </div>
         <div style="display:flex; gap:8px; align-items:flex-end">
           <div style="flex:1">${dtField('d_horario_new','time','')}</div>
-          <div style="flex:1"><input id="d_horario_dose" autocomplete="off" placeholder="dose (opcional)" style="width:100%; padding:11px 12px; border-radius:10px; border:1px solid #E5E0D4; font-family:inherit; font-size:.9rem; box-sizing:border-box"/></div>
+          <div style="flex:1"><input id="d_horario_dose" autocomplete="off" placeholder="dose (opcional)" style="width:100%; padding:11px 12px; border-radius:10px; border:1px solid #E5E0D4; font-family:inherit; font-size:16px; box-sizing:border-box"/></div>
         </div>
       </div>` : ''}
       ${nameConflict()? `<div class="hint" style="color:#B3261E; margin-top:-6px">Já existe um remédio chamado "${esc(draft.name.trim())}".</div>` : ''}
@@ -2143,7 +2143,7 @@ function openMedManager(onDone, jumpToId, startAdding){
         </div>
       ` : ''}
     </div>`;
-    document.getElementById('backToList').addEventListener('click', ()=>{ adding=false; confirmingDeleteId=null; syncMedListVisibility(); render(); });
+    document.getElementById('backToList').addEventListener('click', ()=>{ flushPendingHorario(); syncDraftToList(); adding=false; confirmingDeleteId=null; syncMedListVisibility(); render(); });
     document.getElementById('d_name').addEventListener('input', e=>{ draft.name=e.target.value; syncDraftToList(); refreshInlineOnly(); });
     const deleteBtn = document.getElementById('deleteMedBtn');
     if(deleteBtn) deleteBtn.addEventListener('click', ()=>{ confirmingDeleteId = editingId; renderAddArea(); });
@@ -2161,7 +2161,7 @@ function openMedManager(onDone, jumpToId, startAdding){
     const doseInput = document.getElementById('d_dose');
     if(doseInput) doseInput.addEventListener('input', e=>{ draft.dose=e.target.value; syncDraftToList(); });
     if(isScheduled){
-      wireDtField('d_horario_new', v=>{ if(v){ flushPendingHorario(); syncDraftToList(); renderAddArea(); } });
+      wireDtField('d_horario_new', ()=>{}); // só atualiza o texto exibido; o commit real acontece ao sair do campo de dose
       document.getElementById('d_horario_dose').addEventListener('blur', ()=>{ flushPendingHorario(); syncDraftToList(); renderAddArea(); });
       document.querySelectorAll('[data-rm-horario]').forEach(b=> b.addEventListener('click', ()=>{
         draft.horarios.splice(Number(b.dataset.rmHorario),1);
