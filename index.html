@@ -1226,7 +1226,8 @@ function openEntryModal(category, editId){
         h += `<div class="field">
           ${scheduled.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Horário fixo</label><div class="pickgrid" id="medPickScheduled" style="justify-content:flex-start; margin-bottom:16px">${scheduled.map(cardHtml).join('')}</div>` : ''}
           ${onDemand.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Sob demanda</label><div class="pickgrid" id="medPickOnDemand" style="justify-content:flex-start">${onDemand.map(cardHtml).join('')}</div>` : ''}
-          ${meds.length===0? '<span class="hint">Nenhum remédio cadastrado ainda. Cadastre em Configurações → Gerenciar remédios.</span>' : ''}
+          ${meds.length===0? '<span class="hint">Nenhum remédio cadastrado ainda.</span>' : ''}
+          <button type="button" class="link-btn" id="openMedMgr" style="color:${cat.hex}; margin-top:8px">+ Gerenciar remédios</button>
         </div>`;
       } else {
         h += `<div class="field"><label>Remédio</label>
@@ -1369,7 +1370,7 @@ function openEntryModal(category, editId){
         openMedManager(null, id);
       }));
     }
-    const openMM = document.getElementById('openMedMgr'); if(openMM) openMM.addEventListener('click', ()=> quickPick ? openMedManager(()=>{ refreshBody(); }, null, true) : openMedManager(()=>{ refreshBody(); }));
+    const openMM = document.getElementById('openMedMgr'); if(openMM) openMM.addEventListener('click', ()=> openMedManager(()=>{ refreshBody(); }));
 
     const comoList = document.getElementById('comoList');
     if(comoList) comoList.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.comoComeu = form.comoComeu===b.dataset.v ? '' : b.dataset.v; refreshBody(); }));
@@ -1493,7 +1494,7 @@ function openEntryModal(category, editId){
         openMedManager(null, id);
       }));
     }
-    const openMM = document.getElementById('openMedMgr'); if(openMM) openMM.addEventListener('click', ()=> quickPick ? openMedManager(()=>{ refreshBody(); }, null, true) : openMedManager(()=>{ refreshBody(); }));
+    const openMM = document.getElementById('openMedMgr'); if(openMM) openMM.addEventListener('click', ()=> openMedManager(()=>{ refreshBody(); }));
     const comoList = document.getElementById('comoList'); if(comoList) comoList.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.comoComeu = form.comoComeu===b.dataset.v ? '' : b.dataset.v; refreshBody(); }));
     document.querySelectorAll('[data-g]').forEach(b=> b.addEventListener('click', ()=>{ form.gravidade = form.gravidade===b.dataset.g ? '' : b.dataset.g; refreshBody(); }));
     wirePhoto();
