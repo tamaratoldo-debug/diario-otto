@@ -524,7 +524,8 @@ let chips = {
   consulta: store.get('otto:consulta-chips', []),
   clinica: store.get('otto:clinica-chips', []),
   procedimento: store.get('otto:procedimento-chips', []),
-  quantidade: store.get('otto:quantidade-chips', [])
+  quantidade: store.get('otto:quantidade-chips', []),
+  profissional: store.get('otto:profissional-chips', [])
 };
 let settings = store.get('otto:settings', {sheetLink:'', crecheLink:''});
 const CRECHE_LINK_ANTIGO = 'https://claude.ai/public/artifacts/206f7428-4058-44e8-b558-5db49e3a9673';
@@ -1182,7 +1183,7 @@ async function importBackup(file){
 // ================= ENTRY MODAL =================
 function emptyForm(cat){
   const now = new Date();
-  return { title:'', quantidade:'', dateD: todayStr(), dateT: `${pad(now.getHours())}:${pad(now.getMinutes())}`, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:'', photo:'', photoBlob:null, photoId:'', removedPhoto:false, anexoUrl:'', anexoBlob:null, anexoId:'', anexoName:'', anexoType:'', removedAnexo:false };
+  return { title:'', quantidade:'', dateD: todayStr(), dateT: `${pad(now.getHours())}:${pad(now.getMinutes())}`, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:'', quemFez:'', cobrarViaCreche:false, photo:'', photoBlob:null, photoId:'', removedPhoto:false, anexoUrl:'', anexoBlob:null, anexoId:'', anexoName:'', anexoType:'', removedAnexo:false };
 }
 
 function openEntryModal(category, editId){
@@ -1197,6 +1198,7 @@ function openEntryModal(category, editId){
     dateD: toLocalDateStr(new Date(editing.date)), dateT: fmtTime(editing.date),
     note: editing.note||'', value: editing.value ?? '', gravidade: editing.gravidade||'',
     comoComeu: editing.comoComeu||'', clinica: editing.clinica||'', tipoExame: editing.tipoExame||'',
+    quemFez: editing.quemFez||'', cobrarViaCreche: !!editing.cobrarViaCreche,
     photo: editing.photo||'', photoBlob:null, photoId: editing.photoId||'', removedPhoto:false,
     anexoUrl:'', anexoBlob:null, anexoId: editing.anexoId||'', anexoName: editing.anexoName||'', anexoType: editing.anexoType||'', removedAnexo:false
   } : emptyForm();
@@ -1311,6 +1313,15 @@ function openEntryModal(category, editId){
     }
     if(category==='procedimento'){
       h += `<div class="field"><label>Procedimento</label><input id="f_title" value="${esc(form.title)}" placeholder="ex: Vacina V10, Cirurgia..."/>
+      </div>
+      <div class="field"><label>Quem fez (opcional)</label><input id="f_quemFez" value="${esc(form.quemFez)}"/>
+        <div class="pickgrid" id="qfPick" style="margin-top:6px">${suggestChips('profissional', form.quemFez)}</div>
+      </div>
+      <div class="field"><label>Cobrar via creche</label><div class="tipo-toggle">
+        <button type="button" data-cobrar="sim" class="${form.cobrarViaCreche?'sel':''}" style="${form.cobrarViaCreche?`background:${cat.hex}`:''}">Sim</button>
+        <button type="button" data-cobrar="nao" class="${!form.cobrarViaCreche?'sel':''}" style="${!form.cobrarViaCreche?`background:${cat.hex}`:''}">Não</button>
+      </div>
+        ${form.cobrarViaCreche?'<div class="hint" style="margin-top:6px">O valor entra em Creche → Gerenciar, sem duplicar aqui na timeline.</div>':''}
       </div>`;
     }
     if(category==='exame'){
@@ -1533,7 +1544,9 @@ function openEntryModal(category, editId){
     document.querySelectorAll('[data-g]').forEach(b=> b.addEventListener('click', ()=>{ form.gravidade = form.gravidade===b.dataset.g ? '' : b.dataset.g; refreshBody(); }));
     wirePhoto();
     const tipoExameInput2 = document.getElementById('f_tipoExame'); if(tipoExameInput2) tipoExameInput2.addEventListener('input', e=> form.tipoExame=e.target.value);
-    document.querySelectorAll('[data-sugg]').forEach(b=> b.addEventListener('click', ()=>{ const kind=b.dataset.sugg, val=b.dataset.val; if(kind==='clinica') form.clinica=val; else if(kind==='quantidade') form.quantidade=val; else form.title=val; refreshBody(); }));
+    document.querySelectorAll('[data-sugg]').forEach(b=> b.addEventListener('click', ()=>{ const kind=b.dataset.sugg, val=b.dataset.val; if(kind==='clinica') form.clinica=val; else if(kind==='quantidade') form.quantidade=val; else if(kind==='profissional') form.quemFez=val; else form.title=val; refreshBody(); }));
+    const quemFezInput = document.getElementById('f_quemFez'); if(quemFezInput) quemFezInput.addEventListener('input', e=> form.quemFez=e.target.value);
+    document.querySelectorAll('[data-cobrar]').forEach(b=> b.addEventListener('click', ()=>{ form.cobrarViaCreche = b.dataset.cobrar==='sim'; refreshBody(); }));
   }
 
   function requestClose(){
@@ -1594,6 +1607,10 @@ function openEntryModal(category, editId){
       }
     }
     else if(category==='alimentacao'){ entry.title=form.title.trim(); entry.comoComeu=form.comoComeu; entry.quantidade=form.quantidade.trim(); }
+    else if(category==='procedimento'){
+      entry.title=form.title.trim(); entry.quemFez=form.quemFez.trim(); entry.cobrarViaCreche=!!form.cobrarViaCreche;
+      if(editing && editing.crecheLancId) entry.crecheLancId = editing.crecheLancId;
+    }
     else entry.title=form.title.trim();
 
     if(editing) entries = entries.map(e=> e.id===editing.id? entry : e);
@@ -1607,7 +1624,30 @@ function openEntryModal(category, editId){
       if(entry.title && !chips.consulta.includes(entry.title)){ chips.consulta.push(entry.title); persistChips('consulta'); }
       if(entry.clinica && !chips.clinica.includes(entry.clinica)){ chips.clinica.push(entry.clinica); persistChips('clinica'); }
     }
-    if(category==='procedimento' && entry.title && !chips.procedimento.includes(entry.title)){ chips.procedimento.push(entry.title); persistChips('procedimento'); }
+    if(category==='procedimento'){
+      if(entry.title && !chips.procedimento.includes(entry.title)){ chips.procedimento.push(entry.title); persistChips('procedimento'); }
+      if(entry.quemFez && !chips.profissional.includes(entry.quemFez)){ chips.profissional.push(entry.quemFez); persistChips('profissional'); }
+      if(entry.cobrarViaCreche){
+        const dataStr = toLocalDateStr(new Date(entry.date));
+        if(!entry.crecheLancId){
+          const newLanc = { id:genId(), servicoId:'outro', servicoNome:entry.title, valor:0, data:dataStr, dataSaida:'', obs:entry.quemFez||'', entryId:null, procedimentoEntryId:entry.id, createdAt:Date.now() };
+          crecheLancamentos.push(newLanc);
+          persistCrecheLancamentos();
+          entry.crecheLancId = newLanc.id;
+          entries = entries.map(e=> e.id===entry.id? entry : e);
+          persistEntries();
+        } else {
+          const lanc = crecheLancamentos.find(l=> l.id===entry.crecheLancId);
+          if(lanc){ lanc.servicoNome=entry.title; lanc.data=dataStr; lanc.obs=entry.quemFez||''; persistCrecheLancamentos(); }
+        }
+      } else if(entry.crecheLancId){
+        crecheLancamentos = crecheLancamentos.filter(l=> l.id!==entry.crecheLancId);
+        persistCrecheLancamentos();
+        delete entry.crecheLancId;
+        entries = entries.map(e=> e.id===entry.id? entry : e);
+        persistEntries();
+      }
+    }
     if(category==='alimentacao' && entry.quantidade && !chips.quantidade.includes(entry.quantidade)){ chips.quantidade.push(entry.quantidade); persistChips('quantidade'); }
 
     closeModal();
@@ -1762,7 +1802,11 @@ function openCrecheModal(editingLanc){
     const saveBtn = document.getElementById('btnSaveCreche');
     if(saveBtn) saveBtn.addEventListener('click', save);
     const delBtn = document.getElementById('btnDelCreche');
-    if(delBtn) delBtn.addEventListener('click', ()=>{ closeModal(); openConfirmDelete(lanc.entryId); });
+    if(delBtn) delBtn.addEventListener('click', ()=>{
+      closeModal();
+      if(lanc.entryId){ openConfirmDelete(lanc.entryId); }
+      else { openConfirmDeleteCrecheLanc(lanc.id); }
+    });
   }
 
   function syncSave(){ const b=document.getElementById('btnSaveCreche'); if(b) b.disabled = !canSave(); }
@@ -1937,7 +1981,38 @@ function openConfirmDelete(id){
       crecheLancamentos = crecheLancamentos.filter(l=> l.id!==toRemove.crecheId);
       persistCrecheLancamentos();
     }
+    if(toRemove && toRemove.category==='procedimento' && toRemove.crecheLancId){
+      crecheLancamentos = crecheLancamentos.filter(l=> l.id!==toRemove.crecheLancId);
+      persistCrecheLancamentos();
+    }
     entries = entries.filter(e=>e.id!==id);
+    persistEntries();
+    closeModal();
+    renderAll();
+  });
+}
+
+function openConfirmDeleteCrecheLanc(id){
+  const host = document.getElementById('modalHost');
+  host.innerHTML = `<div class="overlay" id="ovDelCr" style="align-items:center">
+    <div style="background:#fff; border-radius:16px; padding:20px; max-width:320px; width:calc(100% - 48px)">
+      <div style="font-size:.9rem; font-weight:600; margin-bottom:4px">Excluir registro?</div>
+      <div style="font-size:.75rem; color:var(--ink-muted); margin-bottom:16px">Essa ação não pode ser desfeita.</div>
+      <div style="display:flex; gap:8px">
+        <button class="btn-secondary" id="btnCancelDelCr" style="flex:1">Cancelar</button>
+        <button class="btn-danger" id="btnConfirmDelCr">Excluir</button>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('ovDelCr').addEventListener('click', e=>{ if(e.target.id==='ovDelCr') closeModal(); });
+  document.getElementById('btnCancelDelCr').addEventListener('click', closeModal);
+  document.getElementById('btnConfirmDelCr').addEventListener('click', ()=>{
+    crecheLancamentos = crecheLancamentos.filter(l=> l.id!==id);
+    persistCrecheLancamentos();
+    entries = entries.map(e=>{
+      if(e.category==='procedimento' && e.crecheLancId===id){ const e2={...e}; e2.cobrarViaCreche=false; delete e2.crecheLancId; return e2; }
+      return e;
+    });
     persistEntries();
     closeModal();
     renderAll();
