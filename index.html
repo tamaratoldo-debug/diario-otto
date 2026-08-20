@@ -859,7 +859,7 @@ function entryRowHtml(e){
   return `<button class="entry-row" data-id="${e.id}">
     <div class="entry-top">
       <div class="entry-title"><span style="color:${cat.hex}; display:flex">${icon(cat.icon,13,cat.hex)}</span><span style="flex:1; min-width:0">${esc(e.title)}</span>${badge}</div>
-      <span class="entry-time">${fmtTime(e.date)}</span>
+      ${e.category!=='creche' ? `<span class="entry-time">${fmtTime(e.date)}</span>` : ''}
     </div>
     ${sub?`<div class="entry-sub">${esc(sub)}</div>`:''}
   </button>`;
@@ -1809,16 +1809,18 @@ function openCrecheManager(){
     const linhas = list.map(l=>{
       const periodo = l.dataSaida ? `${fmtDDMM(l.data)} a ${fmtDDMM(l.dataSaida)}` : fmtDDMM(l.data);
       const obs = l.obs ? ` - ${l.obs}` : '';
-      return `${periodo} - ${l.servicoNome}: R$ ${fmtValorBR(l.valor)}${obs}`;
+      const valorTxt = l.valor ? `R$ ${fmtValorBR(l.valor)}` : 'valor pendente';
+      return `${periodo} - ${l.servicoNome}: ${valorTxt}${obs}`;
     });
     return `${monthLabel()}\n${linhas.join('\n')}\n\nTotal: R$ ${fmtValorBR(totalDoMes())}`;
   }
 
   function itemHtml(l){
     const periodo = l.dataSaida ? `${fmtDDMM(l.data)} a ${fmtDDMM(l.dataSaida)}` : fmtDDMM(l.data);
+    const valorHtml = l.valor ? `R$ ${fmtValorBR(l.valor)}` : `<span class="badge" style="background:${cat.bgHex}; color:${cat.hex}">sem valor</span>`;
     return `<div class="manager-item" data-open="${l.id}" style="cursor:pointer">
       <div><div class="name">${esc(l.servicoNome)}${l.obs?' · '+esc(l.obs):''}</div><div class="sub">${periodo}</div></div>
-      <div style="font-weight:600; font-size:.85rem">R$ ${fmtValorBR(l.valor)}</div>
+      <div style="font-weight:600; font-size:.85rem">${valorHtml}</div>
     </div>`;
   }
 
