@@ -1183,7 +1183,8 @@ async function importBackup(file){
 // ================= ENTRY MODAL =================
 function emptyForm(cat){
   const now = new Date();
-  return { title:'', quantidade:'', dateD: todayStr(), dateT: `${pad(now.getHours())}:${pad(now.getMinutes())}`, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:'', quemFez:'', cobrarViaCreche:false, photo:'', photoBlob:null, photoId:'', removedPhoto:false, anexoUrl:'', anexoBlob:null, anexoId:'', anexoName:'', anexoType:'', removedAnexo:false };
+  const timeDefault = cat==='procedimento' ? '' : `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  return { title:'', quantidade:'', dateD: todayStr(), dateT: timeDefault, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:'', quemFez:'', cobrarViaCreche:false, photo:'', photoBlob:null, photoId:'', removedPhoto:false, anexoUrl:'', anexoBlob:null, anexoId:'', anexoName:'', anexoType:'', removedAnexo:false };
 }
 
 function openEntryModal(category, editId){
@@ -1201,7 +1202,7 @@ function openEntryModal(category, editId){
     quemFez: editing.quemFez||'', cobrarViaCreche: !!editing.cobrarViaCreche,
     photo: editing.photo||'', photoBlob:null, photoId: editing.photoId||'', removedPhoto:false,
     anexoUrl:'', anexoBlob:null, anexoId: editing.anexoId||'', anexoName: editing.anexoName||'', anexoType: editing.anexoType||'', removedAnexo:false
-  } : emptyForm();
+  } : emptyForm(category);
 
   const cat = CATEGORIES[category];
   const host = document.getElementById('modalHost');
@@ -1321,7 +1322,6 @@ function openEntryModal(category, editId){
         <button type="button" data-cobrar="sim" class="${form.cobrarViaCreche?'sel':''}" style="${form.cobrarViaCreche?`background:${cat.hex}`:''}">Sim</button>
         <button type="button" data-cobrar="nao" class="${!form.cobrarViaCreche?'sel':''}" style="${!form.cobrarViaCreche?`background:${cat.hex}`:''}">Não</button>
       </div>
-        ${form.cobrarViaCreche?'<div class="hint" style="margin-top:6px">O valor entra em Creche → Gerenciar, sem duplicar aqui na timeline.</div>':''}
       </div>`;
     }
     if(category==='exame'){
@@ -1568,7 +1568,7 @@ function openEntryModal(category, editId){
   }
 
   async function save(){
-    const dateIso = new Date(`${form.dateD}T${form.dateT}`).toISOString();
+    const dateIso = new Date(`${form.dateD}T${form.dateT||'12:00'}`).toISOString();
     let entry = { id: editing? editing.id : genId(), category, date: dateIso, note: form.note.trim(), createdAt: editing? editing.createdAt : Date.now() };
     if(category==='peso'){ entry.value = parseFloat(form.value); entry.title='Peso'; }
     else if(category==='exame'){ entry.title=form.tipoExame; entry.tipoExame=form.tipoExame; }
