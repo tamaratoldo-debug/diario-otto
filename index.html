@@ -1432,9 +1432,13 @@ function openEntryModal(category, editId){
       const kind=b.dataset.sugg, val=b.dataset.val;
       if(kind==='clinica') form.clinica=val;
       else if(kind==='quantidade') form.quantidade=val;
+      else if(kind==='profissional') form.quemFez=val;
       else form.title=val;
       refreshBody();
     }));
+
+    const quemFezInput1 = document.getElementById('f_quemFez'); if(quemFezInput1) quemFezInput1.addEventListener('input', e=> form.quemFez=e.target.value);
+    document.querySelectorAll('[data-cobrar]').forEach(b=> b.addEventListener('click', ()=>{ form.cobrarViaCreche = b.dataset.cobrar==='sim'; refreshBody(); }));
   }
 
   function syncSuggestions(){
