@@ -1711,7 +1711,7 @@ function openCrecheModal(editingLanc){
   function render(){
     const fechado = selectedSvc ? isMonthFechado(form.data) : false;
     host.innerHTML = `<div class="overlay" id="ovCreche">
-      <div class="sheet" id="sheetCreche">
+      <div class="sheet" id="sheetCreche" style="max-height:94vh">
         <div class="sheet-head">
           <div class="sheet-title" style="color:${cat.hex}">${icon(cat.icon,17,cat.hex)}<span style="color:var(--ink)">${lanc? 'Editar · Creche' : (selectedSvc? 'Novo · Creche' : 'Creche')}</span></div>
           <div style="display:flex; gap:6px">
@@ -1748,8 +1748,14 @@ function openCrecheModal(editingLanc){
     }
     const nomeEl = document.getElementById('f_nome');
     if(nomeEl) nomeEl.addEventListener('input', ()=>{ form.nome=nomeEl.value; syncSave(); });
-    if(document.getElementById('f_data')) wireDtField('f_data', v=>{ form.data=v; if(selectedSvc==='hotel') recalcHotelValor(); render(); });
-    if(document.getElementById('f_saida')) wireDtField('f_saida', v=>{ form.dataSaida=v; recalcHotelValor(); render(); });
+    if(document.getElementById('f_data')) wireDtField('f_data', v=>{
+      form.data=v;
+      if(selectedSvc==='hotel'){ recalcHotelValor(); const ve=document.getElementById('f_valor'); if(ve) ve.value=form.valor; }
+    });
+    if(document.getElementById('f_saida')) wireDtField('f_saida', v=>{
+      form.dataSaida=v; recalcHotelValor();
+      const ve=document.getElementById('f_valor'); if(ve) ve.value=form.valor;
+    });
     const valorEl = document.getElementById('f_valor');
     if(valorEl) valorEl.addEventListener('input', ()=>{ form.valor=valorEl.value; syncSave(); });
     const obsEl = document.getElementById('f_obs');
@@ -1778,7 +1784,7 @@ function openCrecheModal(editingLanc){
       persistCrecheLancamentos();
       const entry = entries.find(e=> e.id===lanc.entryId);
       if(entry){ entry.title = form.nome; entry.date = new Date(form.data+'T'+ (entry.date? new Date(entry.date).toTimeString().slice(0,8) : '12:00:00')).toISOString(); persistEntries(); }
-      closeModal(); renderAll(); showSuccess('Lançamento atualizado.');
+      closeModal(); renderAll();
     } else {
       const now = new Date();
       const dateIso = new Date(form.data+'T'+now.toTimeString().slice(0,8)).toISOString();
@@ -1788,7 +1794,7 @@ function openCrecheModal(editingLanc){
       crecheLancamentos.push(newLanc);
       entries.push(newEntry);
       persistCrecheLancamentos(); persistEntries();
-      closeModal(); renderAll(); showSuccess(form.nome+' lançado.');
+      closeModal(); renderAll();
     }
   }
 
@@ -1797,7 +1803,7 @@ function openCrecheModal(editingLanc){
     crecheLancamentos = crecheLancamentos.filter(l=> l.id!==lanc.id);
     entries = entries.filter(e=> e.id!==lanc.entryId);
     persistCrecheLancamentos(); persistEntries();
-    closeModal(); renderAll(); showSuccess('Lançamento apagado.');
+    closeModal(); renderAll();
   }
 
   render();
