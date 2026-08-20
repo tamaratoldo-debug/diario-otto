@@ -854,6 +854,7 @@ function entryRowHtml(e){
 }
 
 const normalizeSearch = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const sortMedsByName = (a,b)=> normalizeSearch(a.name).localeCompare(normalizeSearch(b.name), 'pt');
 
 function renderTimeline(){
   let list = entries.slice();
@@ -946,9 +947,12 @@ function renderTimeline(){
       if(isToday){
         pendingHtml = pendingRowsHtml(activeSlotsToday, adHocMedEntriesToday);
       } else {
-        const dayRemedioEntries = day.items.filter(e=> e.category==='remedio');
         day.items = day.items.filter(e=> e.category!=='remedio');
         const dayDateStr = toLocalDateStr(new Date(day.key));
+        // Sempre usa os lançamentos completos (entries, não list) pra decidir
+        // o que foi dado, independente do texto buscado — a busca não pode
+        // fazer remédio já dado parecer que não foi.
+        const dayRemedioEntries = entries.filter(e=> e.category==='remedio' && new Date(e.date).toDateString()===day.key);
         pendingHtml = pastMedGroupHtml(day.key, dayDateStr, dayRemedioEntries, isSearching);
       }
       if(day.items.length===0 && !pendingHtml) continue;
@@ -1204,8 +1208,8 @@ function openEntryModal(category, editId){
     }
     if(category==='remedio'){
       if(quickPick){
-        const onDemand = meds.filter(m=> m.tipo==='sob-demanda');
-        const scheduled = meds.filter(m=> m.tipo!=='sob-demanda' && !(m.tipo==='pontual' && m.dataFim && m.dataFim < todayStr()));
+        const onDemand = meds.filter(m=> m.tipo==='sob-demanda').sort(sortMedsByName);
+        const scheduled = meds.filter(m=> m.tipo!=='sob-demanda' && !(m.tipo==='pontual' && m.dataFim && m.dataFim < todayStr())).sort(sortMedsByName);
         const cardHtml = m=>{
           if(medQuickTimePick===m.id){
             return `<div class="med-pick-btn" style="padding:9px 10px; width:100%">
@@ -1270,8 +1274,10 @@ function openEntryModal(category, editId){
     }
     if(category==='consulta'){
       h += `<div class="field"><label>Motivo</label><input id="f_title" value="${esc(form.title)}" placeholder="ex: Consulta de rotina, retorno..."/>
+        <div class="pickgrid" id="motivoPick" style="margin-top:6px">${suggestChips('consulta', form.title)}</div>
       </div>
       <div class="field"><label>Clínica / veterinário (opcional)</label><input id="f_clinica" value="${esc(form.clinica)}" placeholder="ex: Dra. Ana, Clínica Pet+"/>
+        <div class="pickgrid" id="clinicaPick" style="margin-top:6px">${suggestChips('clinica', form.clinica)}</div>
       </div>
       <div class="field"><label>Anexo (opcional)</label>
         ${form.anexoUrl
@@ -1702,7 +1708,7 @@ function openReport(){
     const pesoEntries = inRange.filter(e=>e.category==='peso').slice().sort((a,b)=> new Date(a.date)-new Date(b.date));
     const continuos = meds.filter(m=> m.tipo==='continuo');
 
-    const medRows = meds.map(m=>{
+    const medRows = meds.slice().sort(sortMedsByName).map(m=>{
       const horarios = m.tipo==='sob-demanda'
         ? (m.dose ? `conforme necessário — ${esc(m.dose)}` : 'conforme necessário')
         : ((m.horarios&&m.horarios.length)? m.horarios.map(h=> `${h.time}${h.dose?' — '+esc(h.dose):''}`).join('<br/>') : '—');
@@ -1993,8 +1999,8 @@ function openMedManager(onDone, jumpToId, startAdding){
 
   function render(){
     submitting = false;
-    const scheduled = list.filter(m=> m.tipo!=='sob-demanda');
-    const onDemand = list.filter(m=> m.tipo==='sob-demanda');
+    const scheduled = list.filter(m=> m.tipo!=='sob-demanda').sort(sortMedsByName);
+    const onDemand = list.filter(m=> m.tipo==='sob-demanda').sort(sortMedsByName);
     const itemHtml = m=> `<div class="manager-item" data-open="${m.id}" style="cursor:pointer"><div><div class="name">${esc(m.name)}</div><div class="sub">${medSubLabel(m)}</div></div><button class="del-btn" data-id="${m.id}">${icon('trash',14,'var(--ink-muted)')}</button></div>`;
     host.innerHTML = `<div class="overlay" id="ovMed">
       <div class="sheet" style="max-height:90vh">
