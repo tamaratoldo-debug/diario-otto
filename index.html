@@ -982,7 +982,11 @@ function renderTimeline(){
       // era a causa do salto de rolagem.
       cardsHtml += `<div class="day-card" data-daycard="${esc(day.key)}" style="${isExpanded?'':'display:none'}"><div class="day-num"><div class="n">${dayNum}</div></div><div class="day-sep"></div><div class="entries-col">`;
       cardsHtml += pendingHtml;
-      const sortedItems = day.items.slice().sort((a,b)=> (a.category==='creche'?0:1) - (b.category==='creche'?0:1));
+      const sortedItems = day.items.slice().sort((a,b)=>{
+        if(a.category==='creche' && b.category!=='creche') return -1;
+        if(b.category==='creche' && a.category!=='creche') return 1;
+        return new Date(a.date) - new Date(b.date);
+      });
       cardsHtml += sortedItems.map(entryRowHtml).join('');
       cardsHtml += `</div></div>`;
     }
@@ -1817,9 +1821,9 @@ function openCrecheManager(){
   }
 
   function itemHtml(l){
-    const periodo = l.dataSaida ? `${fmtDDMM(l.data)} a ${fmtDDMM(l.dataSaida)}` : fmtDDMM(l.data);
+    const periodo = l.dataSaida ? `${fmtDDMM(l.data)} a ${fmtDDMM(l.dataSaida)}` : '';
     const valorHtml = l.valor ? `R$ ${fmtValorBR(l.valor)}` : `<span class="badge" style="background:${cat.bgHex}; color:${cat.hex}">sem valor</span>`;
-    return `<div><div class="name">${esc(l.servicoNome)}${l.obs?' · '+esc(l.obs):''}</div><div class="sub">${periodo}</div></div>
+    return `<div><div class="name">${esc(l.servicoNome)}${l.obs?' · '+esc(l.obs):''}</div>${periodo?`<div class="sub">${periodo}</div>`:''}</div>
       <div style="font-weight:600; font-size:.85rem; flex-shrink:0; margin-left:10px">${valorHtml}</div>`;
   }
 
