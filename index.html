@@ -782,7 +782,7 @@ let medToggleLock = false;
 // dateStr é o dia (YYYY-MM-DD) em que a dose deve ser lançada — 'hoje' quando
 // vem do checklist do dia corrente, ou o dia específico quando vem do
 // checklist de um dia passado (marcação retroativa).
-function toggleMedOnDate(medId, horario, dateStr){
+function toggleMedOnDate(medId, horario, dateStr, explicitTime){
   if(medToggleLock) return;
   medToggleLock = true;
   setTimeout(()=>{ medToggleLock = false; }, 500);
@@ -799,7 +799,10 @@ function toggleMedOnDate(medId, horario, dateStr){
     let date = new Date(y, mo-1, da);
     const slot = (med.horarios||[]).find(h=> h.time===horario);
     const dose = slot ? slot.dose : med.dose;
-    if(horario){ const [h,m2] = horario.split(':').map(Number); date.setHours(h,m2,0,0); } else { date.setHours(12,0,0,0); }
+    if(horario){ const [h,m2] = horario.split(':').map(Number); date.setHours(h,m2,0,0); }
+    else if(explicitTime){ const [h,m2] = explicitTime.split(':').map(Number); date.setHours(h,m2,0,0); }
+    else if(t===todayStr()){ const now = new Date(); date.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0); }
+    else { date.setHours(12,0,0,0); }
     entries.push({ id:genId(), category:'remedio', medId:med.id, horarioSlot:horario||'', title:med.name, note:dose||'', date:date.toISOString(), createdAt:Date.now() });
   }
   entries.sort((a,b)=> new Date(b.date)-new Date(a.date));
@@ -1178,6 +1181,8 @@ function openEntryModal(category, editId){
   const quickPick = category==='remedio' && !editing;
   let medQuickHorarioPick = null;
   let medConcludedExpanded = false;
+  let medQuickTimePick = null;
+  let medQuickTimeVal = '';
 
   function canSave(){
     if(category==='peso') return form.value!=='' && !isNaN(parseFloat(form.value));
@@ -1199,35 +1204,38 @@ function openEntryModal(category, editId){
     }
     if(category==='remedio'){
       if(quickPick){
-        const scheduled = meds.filter(m=> m.tipo!=='sob-demanda' && !(m.tipo==='pontual' && m.dataFim && m.dataFim < todayStr()));
         const onDemand = meds.filter(m=> m.tipo==='sob-demanda');
+        const scheduled = meds.filter(m=> m.tipo!=='sob-demanda' && !(m.tipo==='pontual' && m.dataFim && m.dataFim < todayStr()));
         const cardHtml = m=>{
-          let sub = m.tipo==='sob-demanda' ? (m.dose?esc(m.dose):'') : ((m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : (m.dose?esc(m.dose):''));
-          let givenBadge = '';
-          if(m.tipo==='sob-demanda'){
-            const given = dosesGivenToday(m, '');
-            if(given.length>0) givenBadge = `<div class="mp-sub" style="color:${CATEGORIES.remedio.hex}; font-weight:600">Já dado hoje às ${fmtTime(given[given.length-1].date)}</div>`;
-          }
-          if(medQuickHorarioPick===m.id){
+          if(medQuickTimePick===m.id){
             return `<div class="med-pick-btn" style="padding:9px 10px; width:100%">
-              <div class="mp-name" style="margin-bottom:6px">${esc(m.name)} — qual horário?</div>
-              <div style="display:flex; gap:6px; flex-wrap:wrap">
-                ${m.horarios.map(h=>`<button type="button" class="pick-btn" data-quickloghorario="${m.id}|${h.time}" style="background:${cat.hex}22">${h.time}${h.dose?' · '+esc(h.dose):''}</button>`).join('')}
+              <div class="mp-name" style="margin-bottom:8px">${esc(m.name)} — que horas?</div>
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+                <div style="flex:1; min-width:120px">${dtField('quickTimeInput','time',medQuickTimeVal)}</div>
+                <button type="button" class="pick-btn" data-quicklogtime="${m.id}" style="background:${cat.hex}; color:#fff">Registrar</button>
                 <button type="button" class="pick-btn" data-quickcancel="1">Cancelar</button>
               </div>
             </div>`;
           }
+          const sub = m.dose?esc(m.dose):'';
           return `<button type="button" data-quicklog="${m.id}" class="med-pick-btn" style="display:block; width:100%; text-align:left; padding:9px 12px; font-family:inherit; cursor:pointer; color:inherit">
               <div class="mp-name">${esc(m.name)}</div>
               ${sub?`<div class="mp-sub">${sub}</div>`:''}
-              ${givenBadge}
           </button>`;
+        };
+        const scheduledRowHtml = m=>{
+          const horarios = (m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : (m.dose?esc(m.dose):'');
+          return `<div class="med-pick-btn" style="display:block; width:100%; text-align:left; padding:9px 12px; opacity:.6">
+              <div class="mp-name">${esc(m.name)}</div>
+              ${horarios?`<div class="mp-sub">${horarios}</div>`:''}
+          </div>`;
         };
         h += `<div class="field">
           <button type="button" class="link-btn" id="openMedMgr" style="color:${cat.hex}; margin-bottom:12px">+ Gerenciar remédios</button>
-          ${scheduled.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Horário fixo</label><div class="pickgrid" id="medPickScheduled" style="justify-content:flex-start; margin-bottom:16px">${scheduled.map(cardHtml).join('')}</div>` : ''}
-          ${onDemand.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Sob demanda</label><div class="pickgrid" id="medPickOnDemand" style="justify-content:flex-start">${onDemand.map(cardHtml).join('')}</div>` : ''}
+          ${onDemand.length? `<div class="pickgrid" id="medPickOnDemand" style="justify-content:flex-start; ${scheduled.length?'margin-bottom:16px':''}">${onDemand.map(cardHtml).join('')}</div>` : ''}
           ${meds.length===0? '<span class="hint">Nenhum remédio cadastrado ainda.</span>' : ''}
+          ${meds.length>0 && onDemand.length===0? '<span class="hint">Nenhum remédio sob demanda cadastrado.</span>' : ''}
+          ${scheduled.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Horário fixo — marcado direto na timeline</label><div class="pickgrid" style="justify-content:flex-start">${scheduled.map(scheduledRowHtml).join('')}</div>` : ''}
         </div>`;
       } else {
         h += `<div class="field"><label>Remédio</label>
@@ -1348,20 +1356,19 @@ function openEntryModal(category, editId){
       document.querySelectorAll('[data-quicklog]').forEach(b=> b.addEventListener('click', ()=>{
         const m = meds.find(x=>x.id===b.dataset.quicklog);
         if(!m) return;
-        if(m.tipo==='sob-demanda' || !m.horarios || m.horarios.length<=1){
-          toggleMedToday(m.id, (m.horarios&&m.horarios[0]&&m.horarios[0].time) || '');
-          closeModal();
-        } else {
-          medQuickHorarioPick = m.id;
-          refreshBody();
-        }
+        medQuickTimePick = m.id;
+        const now = new Date();
+        medQuickTimeVal = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        refreshBody();
       }));
-      document.querySelectorAll('[data-quickloghorario]').forEach(b=> b.addEventListener('click', ()=>{
-        const [medId, horario] = b.dataset.quickloghorario.split('|');
-        toggleMedToday(medId, horario);
+      document.querySelectorAll('[data-quicklogtime]').forEach(b=> b.addEventListener('click', ()=>{
+        const medId = b.dataset.quicklogtime;
+        toggleMedOnDate(medId, '', todayStr(), medQuickTimeVal);
+        medQuickTimePick = null;
         closeModal();
       }));
-      document.querySelectorAll('[data-quickcancel]').forEach(b=> b.addEventListener('click', ()=>{ medQuickHorarioPick=null; refreshBody(); }));
+      wireDtField('quickTimeInput', v=>{ if(v) medQuickTimeVal = v; });
+      document.querySelectorAll('[data-quickcancel]').forEach(b=> b.addEventListener('click', ()=>{ medQuickHorarioPick=null; medQuickTimePick=null; refreshBody(); }));
       const toggleConcludedBtn1 = document.getElementById('toggleConcluded');
       if(toggleConcludedBtn1) toggleConcludedBtn1.addEventListener('click', ()=>{ medConcludedExpanded = !medConcludedExpanded; refreshBody(); });
       document.querySelectorAll('[data-quickedit]').forEach(b=> b.addEventListener('click', ()=>{
@@ -1472,20 +1479,19 @@ function openEntryModal(category, editId){
       document.querySelectorAll('[data-quicklog]').forEach(b=> b.addEventListener('click', ()=>{
         const m = meds.find(x=>x.id===b.dataset.quicklog);
         if(!m) return;
-        if(m.tipo==='sob-demanda' || !m.horarios || m.horarios.length<=1){
-          toggleMedToday(m.id, (m.horarios&&m.horarios[0]&&m.horarios[0].time) || '');
-          closeModal();
-        } else {
-          medQuickHorarioPick = m.id;
-          refreshBody();
-        }
+        medQuickTimePick = m.id;
+        const now = new Date();
+        medQuickTimeVal = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        refreshBody();
       }));
-      document.querySelectorAll('[data-quickloghorario]').forEach(b=> b.addEventListener('click', ()=>{
-        const [medId, horario] = b.dataset.quickloghorario.split('|');
-        toggleMedToday(medId, horario);
+      document.querySelectorAll('[data-quicklogtime]').forEach(b=> b.addEventListener('click', ()=>{
+        const medId = b.dataset.quicklogtime;
+        toggleMedOnDate(medId, '', todayStr(), medQuickTimeVal);
+        medQuickTimePick = null;
         closeModal();
       }));
-      document.querySelectorAll('[data-quickcancel]').forEach(b=> b.addEventListener('click', ()=>{ medQuickHorarioPick=null; refreshBody(); }));
+      wireDtField('quickTimeInput', v=>{ if(v) medQuickTimeVal = v; });
+      document.querySelectorAll('[data-quickcancel]').forEach(b=> b.addEventListener('click', ()=>{ medQuickHorarioPick=null; medQuickTimePick=null; refreshBody(); }));
       const toggleConcludedBtn2 = document.getElementById('toggleConcluded');
       if(toggleConcludedBtn2) toggleConcludedBtn2.addEventListener('click', ()=>{ medConcludedExpanded = !medConcludedExpanded; refreshBody(); });
       document.querySelectorAll('[data-quickedit]').forEach(b=> b.addEventListener('click', ()=>{
