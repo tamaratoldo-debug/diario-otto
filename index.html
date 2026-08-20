@@ -1328,7 +1328,15 @@ function openEntryModal(category, editId){
     }
     if(category==='exame'){
       h += `${settings.sheetLink ? `<a href="${esc(settings.sheetLink)}" target="_blank" rel="noreferrer" class="add-trigger" style="margin-bottom:14px; text-decoration:none">${icon('external',15,cat.hex)} Ver planilha de exames</a>` : ''}
-      <div class="field"><label>Tipo de exame (opcional)</label><input id="f_tipoExame" value="${esc(form.tipoExame)}" placeholder="ex: Sangue, Imagem, Urina..."/></div>`;
+      <div class="field"><label>Tipo de exame (opcional)</label><input id="f_tipoExame" value="${esc(form.tipoExame)}" placeholder="ex: Sangue, Imagem, Urina..."/></div>
+      <div class="field"><label>Quem fez (opcional)</label><input id="f_quemFez" value="${esc(form.quemFez)}"/>
+        <div class="pickgrid" id="qfPick" style="margin-top:6px">${suggestChips('profissional', form.quemFez)}</div>
+      </div>
+      <div class="field"><label>Cobrar via creche</label><div class="tipo-toggle">
+        <button type="button" data-cobrar="sim" class="${form.cobrarViaCreche?'sel':''}" style="${form.cobrarViaCreche?`background:${cat.hex}`:''}">Sim</button>
+        <button type="button" data-cobrar="nao" class="${!form.cobrarViaCreche?'sel':''}" style="${!form.cobrarViaCreche?`background:${cat.hex}`:''}">Não</button>
+      </div>
+      </div>`;
     }
     if(quickPick){
       return h;
@@ -1573,7 +1581,7 @@ function openEntryModal(category, editId){
     const dateIso = new Date(`${form.dateD}T${form.dateT||'12:00'}`).toISOString();
     let entry = { id: editing? editing.id : genId(), category, date: dateIso, note: form.note.trim(), createdAt: editing? editing.createdAt : Date.now() };
     if(category==='peso'){ entry.value = parseFloat(form.value); entry.title='Peso'; }
-    else if(category==='exame'){ entry.title=form.tipoExame; entry.tipoExame=form.tipoExame; }
+    else if(category==='exame'){ entry.title=form.tipoExame; entry.tipoExame=form.tipoExame; entry.quemFez=form.quemFez.trim(); entry.cobrarViaCreche=!!form.cobrarViaCreche; if(editing && editing.crecheLancId) entry.crecheLancId = editing.crecheLancId; }
     else if(category==='intercorrencia'){
       entry.title=form.title.trim(); entry.gravidade=form.gravidade;
       if(form.photoBlob){
@@ -1632,11 +1640,14 @@ function openEntryModal(category, editId){
     }
     if(category==='procedimento'){
       if(entry.title && !chips.procedimento.includes(entry.title)){ chips.procedimento.push(entry.title); persistChips('procedimento'); }
+    }
+    if(category==='procedimento' || category==='exame'){
       if(entry.quemFez && !chips.profissional.includes(entry.quemFez)){ chips.profissional.push(entry.quemFez); persistChips('profissional'); }
+      const nomeFinanceiro = (entry.title && entry.title.trim()) || (category==='exame'?'Exame':'Procedimento');
       if(entry.cobrarViaCreche){
         const dataStr = toLocalDateStr(new Date(entry.date));
         if(!entry.crecheLancId){
-          const newLanc = { id:genId(), servicoId:'outro', servicoNome:entry.title, valor:0, data:dataStr, dataSaida:'', obs:entry.quemFez||'', entryId:null, procedimentoEntryId:entry.id, createdAt:Date.now() };
+          const newLanc = { id:genId(), servicoId:'outro', servicoNome:nomeFinanceiro, valor:0, data:dataStr, dataSaida:'', obs:entry.quemFez||'', entryId:null, procedimentoEntryId:entry.id, createdAt:Date.now() };
           crecheLancamentos.push(newLanc);
           persistCrecheLancamentos();
           entry.crecheLancId = newLanc.id;
@@ -1644,7 +1655,7 @@ function openEntryModal(category, editId){
           persistEntries();
         } else {
           const lanc = crecheLancamentos.find(l=> l.id===entry.crecheLancId);
-          if(lanc){ lanc.servicoNome=entry.title; lanc.data=dataStr; lanc.obs=entry.quemFez||''; persistCrecheLancamentos(); }
+          if(lanc){ lanc.servicoNome=nomeFinanceiro; lanc.data=dataStr; lanc.obs=entry.quemFez||''; persistCrecheLancamentos(); }
         }
       } else if(entry.crecheLancId){
         crecheLancamentos = crecheLancamentos.filter(l=> l.id!==entry.crecheLancId);
@@ -1987,7 +1998,7 @@ function openConfirmDelete(id){
       crecheLancamentos = crecheLancamentos.filter(l=> l.id!==toRemove.crecheId);
       persistCrecheLancamentos();
     }
-    if(toRemove && toRemove.category==='procedimento' && toRemove.crecheLancId){
+    if(toRemove && (toRemove.category==='procedimento' || toRemove.category==='exame') && toRemove.crecheLancId){
       crecheLancamentos = crecheLancamentos.filter(l=> l.id!==toRemove.crecheLancId);
       persistCrecheLancamentos();
     }
@@ -2016,7 +2027,7 @@ function openConfirmDeleteCrecheLanc(id){
     crecheLancamentos = crecheLancamentos.filter(l=> l.id!==id);
     persistCrecheLancamentos();
     entries = entries.map(e=>{
-      if(e.category==='procedimento' && e.crecheLancId===id){ const e2={...e}; e2.cobrarViaCreche=false; delete e2.crecheLancId; return e2; }
+      if((e.category==='procedimento' || e.category==='exame') && e.crecheLancId===id){ const e2={...e}; e2.cobrarViaCreche=false; delete e2.crecheLancId; return e2; }
       return e;
     });
     persistEntries();
