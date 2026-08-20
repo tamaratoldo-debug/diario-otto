@@ -153,10 +153,6 @@
   .btn-secondary{padding:13px 16px; border-radius:12px; border:none; background:#F1EEE6; color:var(--ink); font-weight:600; font-size:.9rem; cursor:pointer; font-family:inherit}
   .btn-danger{flex:1; padding:11px; border-radius:10px; border:none; background:#A8473A; color:#fff; font-weight:600; font-size:.85rem; cursor:pointer; font-family:inherit}
   .hint{font-size:.68rem; color:var(--ink-muted); margin-top:4px}
-  .creche-grid{display:grid; grid-template-columns:repeat(2, 1fr); gap:10px}
-  .creche-svc-btn{background:#FBFAF7; border:1px solid #F1EEE6; border-radius:14px; padding:16px 10px; text-align:center; cursor:pointer; font-family:inherit}
-  .creche-svc-btn .nome{font-size:.95rem; font-weight:600; color:var(--ink)}
-  .creche-svc-btn .valor{font-size:.78rem; color:var(--ink-muted); margin-top:3px}
   .manager-item{display:flex; align-items:center; justify-content:space-between; background:#FBFAF7; border-radius:10px; padding:10px 12px; margin-bottom:6px}
   .manager-item .name{font-size:.88rem; font-weight:500}
   .manager-item .sub{font-size:.68rem; color:var(--ink-muted)}
@@ -260,6 +256,7 @@ const ICONS = {
   plus:'<path d="M12 5v14M5 12h14"/>',
   paw:'<circle cx="11" cy="4" r="2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/><path d="M9 10a5 5 0 0 1 5 5v3.5a3.5 3.5 0 0 1-6.84 1.045Q6.52 17.48 4.46 16.84A3.5 3.5 0 0 1 5.5 10Z"/>',
   camera:'<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3Z"/><circle cx="12" cy="13" r="3.5"/>',
+  droplet:'<path d="M12 2s7 8.7 7 13a7 7 0 1 1-14 0c0-4.3 7-13 7-13Z"/>',
   external:'<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/>',
   gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'
 };
@@ -1186,7 +1183,7 @@ function openEntryModal(category, editId){
   if(editId){ editing = entries.find(e=>e.id===editId); category = editing.category; }
   if(editing && editing.category==='creche'){
     const lanc = crecheLancamentos.find(l=> l.id===editing.crecheId);
-    if(lanc){ openCrecheLancamentoForm(lanc.servicoId, lanc); return; }
+    if(lanc){ openCrecheModal(lanc); return; }
   }
   let form = editing ? {
     title: editing.title||'', quantidade: editing.quantidade||'',
@@ -1650,98 +1647,116 @@ function diffDias(dataStr, dataSaidaStr){
   return d>0 ? d : 0;
 }
 
-function openCrecheModal(){
+function openCrecheModal(editingLanc){
   const host = document.getElementById('modalHost');
-  function render(){
-    const cat = CATEGORIES.creche;
-    const cards = crecheServicos.map(s=> `<button class="creche-svc-btn" data-svc="${s.id}">
-        <div class="nome">${esc(s.nome)}</div>
-        <div class="valor">R$ ${fmtValorBR(s.valor)}${s.id==='hotel'?'/dia':''}</div>
-      </button>`).join('');
-    host.innerHTML = `<div class="overlay" id="ovCreche">
-      <div class="sheet" style="max-height:90vh">
-        <div class="sheet-head"><div class="sheet-title" style="display:flex; align-items:center; gap:8px"><span style="color:${cat.hex}; display:flex">${icon('home',18,cat.hex)}</span>Creche</div></div>
-        <div class="sheet-body">
-          <div class="creche-grid">
-            ${cards}
-            <button class="creche-svc-btn" data-svc="outro" style="background:${cat.bgHex}; color:${cat.hex}">
-              <div class="nome" style="color:${cat.hex}">${icon('plus',18,cat.hex)}</div>
-              <div class="valor" style="color:${cat.hex}">Outro</div>
-            </button>
-          </div>
-        </div>
-        <div class="sheet-foot"><button class="btn-secondary" id="closeCrecheBtn" style="flex:1">Fechar</button></div>
-      </div>
-    </div>`;
-    document.getElementById('ovCreche').addEventListener('click', e=>{ if(e.target.id==='ovCreche') closeModal(); });
-    document.getElementById('closeCrecheBtn').addEventListener('click', closeModal);
-    host.querySelectorAll('.creche-svc-btn').forEach(b=> b.addEventListener('click', ()=> openCrecheLancamentoForm(b.dataset.svc)));
-  }
-  render();
-}
-
-// svcId: 'creche'|'hotel'|'banho'|'outro'. lanc: lançamento existente (edição) ou null (novo).
-function openCrecheLancamentoForm(svcId, lanc){
-  const host = document.getElementById('modalHost');
-  const servico = crecheServicos.find(s=>s.id===svcId) || null;
-  const isHotel = svcId==='hotel';
-  const isOutro = svcId==='outro' || !servico;
   const cat = CATEGORIES.creche;
+  let lanc = editingLanc || null;
+  let selectedSvc = lanc ? lanc.servicoId : null;
   let confirmingDelete = false;
-  let submitting = false;
-  const form = lanc ? {
-    nome: lanc.servicoNome, valor: fmtValorBR(lanc.valor),
-    data: lanc.data, dataSaida: lanc.dataSaida||'', obs: lanc.obs||''
-  } : {
-    nome: isOutro ? '' : servico.nome, valor: isOutro ? '' : fmtValorBR(servico.valor),
-    data: todayStr(), dataSaida: '', obs: ''
-  };
-  const fechado = isMonthFechado(form.data);
+  let form = null;
+
+  function servicoOf(id){ return crecheServicos.find(s=>s.id===id) || null; }
+  function svcIcon(id){ return id==='hotel' ? 'calendar' : id==='banho' ? 'droplet' : id==='outro' ? 'plus' : 'home'; }
 
   function recalcHotelValor(){
-    if(!isHotel || !servico) return;
+    const servico = servicoOf('hotel');
+    if(!servico) return;
     const dias = diffDias(form.data, form.dataSaida);
     if(dias>0) form.valor = fmtValorBR(dias*servico.valor);
   }
-  if(isHotel && !lanc) recalcHotelValor();
 
-  function canSave(){ return form.nome.trim()!=='' && form.data!==''; }
+  function initForm(){
+    const servico = servicoOf(selectedSvc);
+    const isOutro = selectedSvc==='outro' || !servico;
+    if(lanc){
+      form = { nome: lanc.servicoNome, valor: fmtValorBR(lanc.valor), data: lanc.data, dataSaida: lanc.dataSaida||'', obs: lanc.obs||'' };
+    } else {
+      form = { nome: isOutro?'':servico.nome, valor: isOutro?'':fmtValorBR(servico.valor), data: todayStr(), dataSaida:'', obs:'' };
+      if(selectedSvc==='hotel') recalcHotelValor();
+    }
+  }
+  if(selectedSvc) initForm();
+
+  function canSave(){ return !!form && form.nome.trim()!=='' && form.data!==''; }
+
+  function selectorHtml(){
+    const items = crecheServicos.map(s=>({id:s.id, nome:s.nome})).concat([{id:'outro', nome:'Outro'}]);
+    return `<div class="quick-grid" style="margin-bottom:${selectedSvc?'20px':'2px'}">
+      ${items.map(it=> `<button type="button" data-svc="${it.id}">
+        <span class="icon-circle" style="background:${selectedSvc===it.id?cat.bgHex:'#EEF0F5'}">${icon(svcIcon(it.id),20,selectedSvc===it.id?cat.hex:'#3D4250')}</span>
+        <span class="lbl">${esc(it.nome)}</span>
+      </button>`).join('')}
+    </div>`;
+  }
+
+  function fieldsHtml(){
+    if(!selectedSvc) return '';
+    const isHotel = selectedSvc==='hotel';
+    const isOutro = selectedSvc==='outro';
+    const fechado = isMonthFechado(form.data);
+    let h = '';
+    if(fechado) h += `<div class="hint" style="margin-bottom:10px">Este mês já está fechado. Reabra em Gerenciar pra editar.</div>`;
+    if(isOutro) h += `<div class="field"><label>Serviço</label><input id="f_nome" value="${esc(form.nome)}" ${fechado?'disabled':''}/></div>`;
+    h += `<div class="field"${fechado?' style="pointer-events:none; opacity:.6"':''}><label>${isHotel?'Período':'Data'}</label>`;
+    h += isHotel
+      ? `<div class="row2"><div style="flex:1">${dtField('f_data','date',form.data)}</div><div style="flex:1">${dtField('f_saida','date',form.dataSaida,'Saída')}</div></div>`
+      : dtField('f_data','date',form.data);
+    h += `</div>
+      <div class="field"><label>Valor (R$)</label><input inputmode="decimal" id="f_valor" value="${esc(form.valor)}" ${fechado?'disabled':''}/></div>
+      <div class="field"><label>Observação (opcional)</label><textarea id="f_obs" ${fechado?'disabled':''}>${esc(form.obs)}</textarea></div>`;
+    if(confirmingDelete) h += `<div class="hint" style="color:var(--c-intercorrencia)">Apagar este lançamento? <button type="button" class="link-btn" id="confirmDelBtn" style="color:var(--c-intercorrencia)">Apagar</button> · <button type="button" class="link-btn" id="cancelDelBtn">Cancelar</button></div>`;
+    return h;
+  }
 
   function render(){
-    submitting = false;
-    host.innerHTML = `<div class="overlay" id="ovCrLanc">
-      <div class="sheet">
+    const fechado = selectedSvc ? isMonthFechado(form.data) : false;
+    host.innerHTML = `<div class="overlay" id="ovCreche">
+      <div class="sheet" id="sheetCreche">
         <div class="sheet-head">
-          <div class="sheet-title" style="display:flex; align-items:center; gap:8px"><span style="color:${cat.hex}; display:flex">${icon('home',18,cat.hex)}</span>${lanc?'Editar lançamento':form.nome||'Novo lançamento'}</div>
+          <div class="sheet-title" style="color:${cat.hex}">${icon(cat.icon,17,cat.hex)}<span style="color:var(--ink)">${lanc? 'Editar · Creche' : (selectedSvc? 'Novo · Creche' : 'Creche')}</span></div>
+          <div style="display:flex; gap:6px">
+            ${lanc && !fechado? `<button class="icon-btn danger" id="btnDelCreche">${icon('trash',17,'#A8473A')}</button>` : ''}
+            <button class="icon-btn" id="btnCloseCreche">${icon('x',18)}</button>
+          </div>
         </div>
         <div class="sheet-body">
-          ${fechado?`<div class="hint" style="margin-bottom:12px">Este mês já está fechado. Reabra o mês em Gerenciar para editar.</div>`:''}
-          ${isOutro?`<div class="field"><label>Serviço</label><input type="text" id="f_nome" value="${esc(form.nome)}" ${fechado?'disabled':''}/></div>`:''}
-          <div class="field"${fechado?' style="pointer-events:none; opacity:.6"':''}><label>Data</label>${dtField('f_data','date',form.data)}</div>
-          ${isHotel?`<div class="field"${fechado?' style="pointer-events:none; opacity:.6"':''}><label>Data de saída</label>${dtField('f_saida','date',form.dataSaida)}</div>`:''}
-          <div class="field"><label>Valor (R$)</label><input type="text" inputmode="decimal" id="f_valor" value="${esc(form.valor)}" ${fechado?'disabled':''}/></div>
-          <div class="field"><label>Observações</label><input type="text" id="f_obs" value="${esc(form.obs)}" ${fechado?'disabled':''}/></div>
-          ${confirmingDelete?`<div class="hint" style="color:var(--c-intercorrencia); margin-top:6px">Apagar este lançamento? <button class="link-btn" id="confirmDelBtn" style="color:var(--c-intercorrencia)">Apagar</button> · <button class="link-btn" id="cancelDelBtn">Cancelar</button></div>`:''}
+          ${lanc ? '' : selectorHtml()}
+          ${fieldsHtml()}
         </div>
-        <div class="sheet-foot" style="gap:8px">
-          ${lanc && !fechado ? `<button class="btn-secondary" id="delLancBtn">${icon('trash',15,'var(--ink-muted)')}</button>` : ''}
-          <button class="btn-secondary" id="backCrLancBtn" style="flex:${lanc?'0':'1'}">${lanc?'Fechar':'Voltar'}</button>
-          ${!fechado?`<button class="btn-primary" id="saveCrLancBtn" ${canSave()?'':'disabled'}>Salvar</button>`:''}
-        </div>
+        ${selectedSvc && !fechado ? `<div class="sheet-foot">
+          <button class="btn-secondary" id="btnCancelCreche">Cancelar</button>
+          <button class="btn-primary" id="btnSaveCreche" ${canSave()?'':'disabled'}>${lanc?'Salvar alterações':'Registrar'}</button>
+        </div>` : (!selectedSvc ? `<div class="sheet-foot"><button class="btn-secondary" id="btnCancelCreche" style="flex:1">Fechar</button></div>` : '')}
       </div>
     </div>`;
-    document.getElementById('ovCrLanc').addEventListener('click', e=>{ if(e.target.id==='ovCrLanc') closeModal(); });
-    document.getElementById('backCrLancBtn').addEventListener('click', ()=> lanc? closeModal() : openCrecheModal());
-    if(isOutro){
-      wireInput('f_nome', v=>{ form.nome=v; });
+    wire();
+  }
+
+  function wire(){
+    document.getElementById('ovCreche').addEventListener('click', e=>{ if(e.target.id==='ovCreche') closeModal(); });
+    document.getElementById('btnCloseCreche').addEventListener('click', closeModal);
+    const cancelBtn = document.getElementById('btnCancelCreche');
+    if(cancelBtn) cancelBtn.addEventListener('click', ()=>{
+      if(lanc){ closeModal(); }
+      else if(selectedSvc){ selectedSvc=null; form=null; confirmingDelete=false; render(); }
+      else closeModal();
+    });
+    if(!lanc){
+      host.querySelectorAll('[data-svc]').forEach(b=> b.addEventListener('click', ()=>{
+        selectedSvc = b.dataset.svc; initForm(); render();
+      }));
     }
-    wireDtField('f_data', v=>{ form.data=v; if(isHotel) recalcHotelValor(); render(); });
-    if(isHotel) wireDtField('f_saida', v=>{ form.dataSaida=v; recalcHotelValor(); render(); });
-    wireInput('f_valor', v=>{ form.valor=v; });
-    wireInput('f_obs', v=>{ form.obs=v; });
-    const saveBtn = document.getElementById('saveCrLancBtn');
+    const nomeEl = document.getElementById('f_nome');
+    if(nomeEl) nomeEl.addEventListener('input', ()=>{ form.nome=nomeEl.value; syncSave(); });
+    if(document.getElementById('f_data')) wireDtField('f_data', v=>{ form.data=v; if(selectedSvc==='hotel') recalcHotelValor(); render(); });
+    if(document.getElementById('f_saida')) wireDtField('f_saida', v=>{ form.dataSaida=v; recalcHotelValor(); render(); });
+    const valorEl = document.getElementById('f_valor');
+    if(valorEl) valorEl.addEventListener('input', ()=>{ form.valor=valorEl.value; syncSave(); });
+    const obsEl = document.getElementById('f_obs');
+    if(obsEl) obsEl.addEventListener('input', ()=>{ form.obs=obsEl.value; });
+    const saveBtn = document.getElementById('btnSaveCreche');
     if(saveBtn) saveBtn.addEventListener('click', save);
-    const delBtn = document.getElementById('delLancBtn');
+    const delBtn = document.getElementById('btnDelCreche');
     if(delBtn) delBtn.addEventListener('click', ()=>{ confirmingDelete=true; render(); });
     const confirmDelBtn = document.getElementById('confirmDelBtn');
     if(confirmDelBtn) confirmDelBtn.addEventListener('click', doDelete);
@@ -1749,25 +1764,16 @@ function openCrecheLancamentoForm(svcId, lanc){
     if(cancelDelBtn) cancelDelBtn.addEventListener('click', ()=>{ confirmingDelete=false; render(); });
   }
 
-  function wireInput(id, onChange){
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.addEventListener('input', ()=>{ onChange(el.value); syncSaveBtn(); });
-  }
-  function syncSaveBtn(){
-    const b = document.getElementById('saveCrLancBtn');
-    if(b) b.disabled = !canSave();
-  }
+  function syncSave(){ const b=document.getElementById('btnSaveCreche'); if(b) b.disabled = !canSave(); }
 
   function save(){
-    if(!canSave() || submitting) return;
-    submitting = true;
+    if(!canSave()) return;
     const valorNum = parseValorBR(form.valor);
     if(lanc){
       lanc.servicoNome = form.nome;
       lanc.valor = valorNum;
       lanc.data = form.data;
-      lanc.dataSaida = isHotel ? form.dataSaida : '';
+      lanc.dataSaida = selectedSvc==='hotel' ? form.dataSaida : '';
       lanc.obs = form.obs.trim();
       persistCrecheLancamentos();
       const entry = entries.find(e=> e.id===lanc.entryId);
@@ -1776,7 +1782,7 @@ function openCrecheLancamentoForm(svcId, lanc){
     } else {
       const now = new Date();
       const dateIso = new Date(form.data+'T'+now.toTimeString().slice(0,8)).toISOString();
-      const newLanc = { id:genId(), servicoId:svcId, servicoNome:form.nome, valor:valorNum, data:form.data, dataSaida: isHotel?form.dataSaida:'', obs:form.obs.trim(), entryId:null, createdAt:Date.now() };
+      const newLanc = { id:genId(), servicoId:selectedSvc, servicoNome:form.nome, valor:valorNum, data:form.data, dataSaida: selectedSvc==='hotel'?form.dataSaida:'', obs:form.obs.trim(), entryId:null, createdAt:Date.now() };
       const newEntry = { id:genId(), category:'creche', crecheId:newLanc.id, title:form.nome, note:'', date:dateIso, createdAt:Date.now() };
       newLanc.entryId = newEntry.id;
       crecheLancamentos.push(newLanc);
