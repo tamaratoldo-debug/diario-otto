@@ -1651,8 +1651,7 @@ function openCrecheModal(editingLanc){
   const host = document.getElementById('modalHost');
   const cat = CATEGORIES.creche;
   let lanc = editingLanc || null;
-  let selectedSvc = lanc ? lanc.servicoId : null;
-  let confirmingDelete = false;
+  let selectedSvc = lanc ? lanc.servicoId : crecheServicos[0].id;
   let form = null;
 
   function servicoOf(id){ return crecheServicos.find(s=>s.id===id) || null; }
@@ -1675,13 +1674,13 @@ function openCrecheModal(editingLanc){
       if(selectedSvc==='hotel') recalcHotelValor();
     }
   }
-  if(selectedSvc) initForm();
+  initForm();
 
   function canSave(){ return !!form && form.nome.trim()!=='' && form.data!==''; }
 
   function selectorHtml(){
     const items = crecheServicos.map(s=>({id:s.id, nome:s.nome})).concat([{id:'outro', nome:'Outro'}]);
-    return `<div class="quick-grid" style="margin-bottom:${selectedSvc?'20px':'2px'}">
+    return `<div class="quick-grid" style="margin-bottom:20px">
       ${items.map(it=> `<button type="button" data-svc="${it.id}">
         <span class="icon-circle" style="background:${selectedSvc===it.id?cat.bgHex:'#EEF0F5'}">${icon(svcIcon(it.id),20,selectedSvc===it.id?cat.hex:'#3D4250')}</span>
         <span class="lbl">${esc(it.nome)}</span>
@@ -1690,7 +1689,6 @@ function openCrecheModal(editingLanc){
   }
 
   function fieldsHtml(){
-    if(!selectedSvc) return '';
     const isHotel = selectedSvc==='hotel';
     const isOutro = selectedSvc==='outro';
     const fechado = isMonthFechado(form.data);
@@ -1704,16 +1702,15 @@ function openCrecheModal(editingLanc){
     h += `</div>
       <div class="field"><label>Valor (R$)</label><input inputmode="decimal" id="f_valor" value="${esc(form.valor)}" ${fechado?'disabled':''}/></div>
       <div class="field"><label>Observação (opcional)</label><textarea id="f_obs" ${fechado?'disabled':''}>${esc(form.obs)}</textarea></div>`;
-    if(confirmingDelete) h += `<div class="hint" style="color:var(--c-intercorrencia)">Apagar este lançamento? <button type="button" class="link-btn" id="confirmDelBtn" style="color:var(--c-intercorrencia)">Apagar</button> · <button type="button" class="link-btn" id="cancelDelBtn">Cancelar</button></div>`;
     return h;
   }
 
   function render(){
-    const fechado = selectedSvc ? isMonthFechado(form.data) : false;
+    const fechado = isMonthFechado(form.data);
     host.innerHTML = `<div class="overlay" id="ovCreche">
-      <div class="sheet" id="sheetCreche" style="max-height:94vh">
+      <div class="sheet" id="sheetCreche">
         <div class="sheet-head">
-          <div class="sheet-title" style="color:${cat.hex}">${icon(cat.icon,17,cat.hex)}<span style="color:var(--ink)">${lanc? 'Editar · Creche' : (selectedSvc? 'Novo · Creche' : 'Creche')}</span></div>
+          <div class="sheet-title" style="color:${cat.hex}">${icon(cat.icon,17,cat.hex)}<span style="color:var(--ink)">${lanc? 'Editar · Creche' : 'Novo · Creche'}</span></div>
           <div style="display:flex; gap:6px">
             ${lanc && !fechado? `<button class="icon-btn danger" id="btnDelCreche">${icon('trash',17,'#A8473A')}</button>` : ''}
             <button class="icon-btn" id="btnCloseCreche">${icon('x',18)}</button>
@@ -1723,10 +1720,10 @@ function openCrecheModal(editingLanc){
           ${lanc ? '' : selectorHtml()}
           ${fieldsHtml()}
         </div>
-        ${selectedSvc && !fechado ? `<div class="sheet-foot">
+        ${!fechado ? `<div class="sheet-foot">
           <button class="btn-secondary" id="btnCancelCreche">Cancelar</button>
           <button class="btn-primary" id="btnSaveCreche" ${canSave()?'':'disabled'}>${lanc?'Salvar alterações':'Registrar'}</button>
-        </div>` : (!selectedSvc ? `<div class="sheet-foot"><button class="btn-secondary" id="btnCancelCreche" style="flex:1">Fechar</button></div>` : '')}
+        </div>` : ''}
       </div>
     </div>`;
     wire();
@@ -1736,11 +1733,7 @@ function openCrecheModal(editingLanc){
     document.getElementById('ovCreche').addEventListener('click', e=>{ if(e.target.id==='ovCreche') closeModal(); });
     document.getElementById('btnCloseCreche').addEventListener('click', closeModal);
     const cancelBtn = document.getElementById('btnCancelCreche');
-    if(cancelBtn) cancelBtn.addEventListener('click', ()=>{
-      if(lanc){ closeModal(); }
-      else if(selectedSvc){ selectedSvc=null; form=null; confirmingDelete=false; render(); }
-      else closeModal();
-    });
+    if(cancelBtn) cancelBtn.addEventListener('click', closeModal);
     if(!lanc){
       host.querySelectorAll('[data-svc]').forEach(b=> b.addEventListener('click', ()=>{
         selectedSvc = b.dataset.svc; initForm(); render();
@@ -1763,11 +1756,7 @@ function openCrecheModal(editingLanc){
     const saveBtn = document.getElementById('btnSaveCreche');
     if(saveBtn) saveBtn.addEventListener('click', save);
     const delBtn = document.getElementById('btnDelCreche');
-    if(delBtn) delBtn.addEventListener('click', ()=>{ confirmingDelete=true; render(); });
-    const confirmDelBtn = document.getElementById('confirmDelBtn');
-    if(confirmDelBtn) confirmDelBtn.addEventListener('click', doDelete);
-    const cancelDelBtn = document.getElementById('cancelDelBtn');
-    if(cancelDelBtn) cancelDelBtn.addEventListener('click', ()=>{ confirmingDelete=false; render(); });
+    if(delBtn) delBtn.addEventListener('click', ()=>{ closeModal(); openConfirmDelete(lanc.entryId); });
   }
 
   function syncSave(){ const b=document.getElementById('btnSaveCreche'); if(b) b.disabled = !canSave(); }
@@ -1798,14 +1787,6 @@ function openCrecheModal(editingLanc){
     }
   }
 
-  function doDelete(){
-    if(!lanc) return;
-    crecheLancamentos = crecheLancamentos.filter(l=> l.id!==lanc.id);
-    entries = entries.filter(e=> e.id!==lanc.entryId);
-    persistCrecheLancamentos(); persistEntries();
-    closeModal(); renderAll();
-  }
-
   render();
 }
 
@@ -1827,6 +1808,10 @@ function openConfirmDelete(id){
     const toRemove = entries.find(e=>e.id===id);
     if(toRemove && toRemove.photoId) idbDeletePhoto(toRemove.photoId).catch(()=>{});
     if(toRemove && toRemove.anexoId) idbDeletePhoto(toRemove.anexoId).catch(()=>{});
+    if(toRemove && toRemove.category==='creche' && toRemove.crecheId){
+      crecheLancamentos = crecheLancamentos.filter(l=> l.id!==toRemove.crecheId);
+      persistCrecheLancamentos();
+    }
     entries = entries.filter(e=>e.id!==id);
     persistEntries();
     closeModal();
