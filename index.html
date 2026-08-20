@@ -1199,10 +1199,7 @@ function openEntryModal(category, editId){
     }
     if(category==='remedio'){
       if(quickPick){
-        const t = todayStr();
-        const isConcluded = m=> m.tipo==='pontual' && m.dataFim && m.dataFim < t;
-        const scheduled = meds.filter(m=> m.tipo!=='sob-demanda' && !isConcluded(m));
-        const concluded = meds.filter(m=> isConcluded(m));
+        const scheduled = meds.filter(m=> m.tipo!=='sob-demanda' && !(m.tipo==='pontual' && m.dataFim && m.dataFim < todayStr()));
         const onDemand = meds.filter(m=> m.tipo==='sob-demanda');
         const cardHtml = m=>{
           let sub = m.tipo==='sob-demanda' ? (m.dose?esc(m.dose):'') : ((m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : (m.dose?esc(m.dose):''));
@@ -1220,23 +1217,16 @@ function openEntryModal(category, editId){
               </div>
             </div>`;
           }
-          return `<div class="med-pick-btn" style="display:flex; align-items:stretch; gap:0; padding:0 2px 0 12px">
-            <button type="button" data-quicklog="${m.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:9px 6px 9px 0; font-family:inherit; cursor:pointer; color:inherit">
+          return `<button type="button" data-quicklog="${m.id}" class="med-pick-btn" style="display:block; width:100%; text-align:left; padding:9px 12px; font-family:inherit; cursor:pointer; color:inherit">
               <div class="mp-name">${esc(m.name)}</div>
               ${sub?`<div class="mp-sub">${sub}</div>`:''}
               ${givenBadge}
-            </button>
-            <button type="button" data-quickedit="${m.id}" style="background:none; border:none; padding:8px; color:var(--ink-muted); cursor:pointer; flex-shrink:0">${icon('pencil',14,'var(--ink-muted)')}</button>
-          </div>`;
+          </button>`;
         };
         h += `<div class="field">
-          <button type="button" class="add-trigger" id="openMedMgr" style="margin-bottom:14px">${icon('plus',15)} Cadastrar remédio</button>
           ${scheduled.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Horário fixo</label><div class="pickgrid" id="medPickScheduled" style="justify-content:flex-start; margin-bottom:16px">${scheduled.map(cardHtml).join('')}</div>` : ''}
-          ${onDemand.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Sob demanda</label><div class="pickgrid" id="medPickOnDemand" style="justify-content:flex-start; ${concluded.length?'margin-bottom:16px':''}">${onDemand.map(cardHtml).join('')}</div>` : ''}
-          ${concluded.length? `<button type="button" id="toggleConcluded" style="display:flex; align-items:center; gap:4px; background:none; border:none; padding:0; font-family:inherit; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:${medConcludedExpanded?'6px':'0'}; cursor:pointer">
-            <span>Concluídos (${concluded.length})</span>${icon(medConcludedExpanded?'chevronUp':'chevronDown',13,'var(--ink-muted)')}
-          </button>${medConcludedExpanded? `<div class="pickgrid" id="medPickConcluded" style="justify-content:flex-start">${concluded.map(cardHtml).join('')}</div>` : ''}` : ''}
-          ${meds.length===0? '<span class="hint">Nenhum remédio cadastrado ainda.</span>' : ''}
+          ${onDemand.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Sob demanda</label><div class="pickgrid" id="medPickOnDemand" style="justify-content:flex-start">${onDemand.map(cardHtml).join('')}</div>` : ''}
+          ${meds.length===0? '<span class="hint">Nenhum remédio cadastrado ainda. Cadastre em Configurações → Gerenciar remédios.</span>' : ''}
         </div>`;
       } else {
         h += `<div class="field"><label>Remédio</label>
@@ -1810,7 +1800,10 @@ function openSettings(){
           <div class="field"><label>Link da planilha de exames (opcional, Google Sheets)</label><input id="linkInput" value="${esc(draftSheetLink)}" placeholder="https://..."/></div>
           <div class="field"><label>Link do app da creche (opcional)</label><input id="crecheLinkInput" value="${esc(draftCrecheLink)}" placeholder="https://..."/></div>
           <div style="display:flex; gap:10px; padding-top:14px; margin-top:6px; border-top:1px solid #F1EEE6">
+            <button type="button" id="manageMedsBtn" class="btn-secondary" style="flex:1; font-size:.82rem; padding:11px 8px">Gerenciar remédios</button>
             <button type="button" id="reportBtn" class="btn-secondary" style="flex:1; font-size:.82rem; padding:11px 8px">Gerar relatório</button>
+          </div>
+          <div style="display:flex; gap:10px; padding-top:10px">
             <button type="button" id="importBtn" class="btn-secondary" style="flex:1; font-size:.82rem; padding:11px 8px">Restaurar backup</button>
             <input type="file" id="importFileInput" accept="application/json" style="display:none"/>
           </div>
@@ -1824,6 +1817,7 @@ function openSettings(){
     const linkEl = document.getElementById('linkInput'); linkEl.addEventListener('input', e=> draftSheetLink=e.target.value);
     const crecheLinkEl = document.getElementById('crecheLinkInput'); crecheLinkEl.addEventListener('input', e=> draftCrecheLink=e.target.value);
     const importFileEl = document.getElementById('importFileInput');
+    document.getElementById('manageMedsBtn').addEventListener('click', ()=> openMedManager(()=> openSettings()));
     document.getElementById('reportBtn').addEventListener('click', ()=> openReport());
     document.getElementById('importBtn').addEventListener('click', ()=> importFileEl.click());
     importFileEl.addEventListener('change', async (e)=>{
@@ -1968,6 +1962,7 @@ function openMedManager(onDone, jumpToId, startAdding){
   let editingId = null;
   let draft = {name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[]};
   let submitting = false;
+  let confirmingDeleteId = null;
 
   if(jumpToId){
     const m = list.find(x=>x.id===jumpToId);
@@ -2010,15 +2005,22 @@ function openMedManager(onDone, jumpToId, startAdding){
     document.getElementById('doneMedBtn').addEventListener('click', finish);
     document.querySelectorAll('#medList .del-btn').forEach(b=> b.addEventListener('click', (ev)=>{
       ev.stopPropagation();
-      list = list.filter(m=>m.id!==b.dataset.id);
-      if(editingId===b.dataset.id){ adding=false; editingId=null; }
-      render();
+      const m = list.find(x=>x.id===b.dataset.id);
+      if(!m) return;
+      editingId = m.id;
+      adding = true;
+      confirmingDeleteId = m.id;
+      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).map(h=>({...h})) };
+      syncMedListVisibility();
+      renderAddArea();
+      document.getElementById('addArea').scrollIntoView({behavior:'smooth', block:'center'});
     }));
     document.querySelectorAll('#medList .manager-item').forEach(row=> row.addEventListener('click', ()=>{
       const m = list.find(x=>x.id===row.dataset.open);
       if(!m) return;
       editingId = m.id;
       adding = true;
+      confirmingDeleteId = null;
       draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).map(h=>({...h})) };
       syncMedListVisibility();
       renderAddArea();
@@ -2036,7 +2038,7 @@ function openMedManager(onDone, jumpToId, startAdding){
     const area = document.getElementById('addArea');
     if(!adding){
       area.innerHTML = `<button class="add-trigger" id="startAdd" style="margin-bottom:14px">${icon('plus',15)} Cadastrar remédio</button>`;
-      document.getElementById('startAdd').addEventListener('click', ()=>{ adding=true; editingId=null; draft={name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[], newHorarioTime:'', newHorarioDose:''}; syncMedListVisibility(); renderAddArea(); });
+      document.getElementById('startAdd').addEventListener('click', ()=>{ adding=true; editingId=null; confirmingDeleteId=null; draft={name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[], newHorarioTime:'', newHorarioDose:''}; syncMedListVisibility(); renderAddArea(); });
       return;
     }
     const isScheduled = draft.tipo==='continuo' || draft.tipo==='pontual';
@@ -2066,18 +2068,30 @@ function openMedManager(onDone, jumpToId, startAdding){
         </div>
         <button type="button" class="btn-secondary" id="addHorarioBtn" style="width:100%; margin-top:8px">Adicionar horário</button>
       </div>` : ''}
-      <div style="display:flex; gap:8px; margin-top:4px">
-        ${editingId? `<button class="btn-secondary" id="deleteMedBtn" style="color:#B3261E; padding:0 14px">${icon('trash',16,'#B3261E')}</button>` : ''}
+      ${editingId && confirmingDeleteId===editingId? `
+        <div style="background:#FBEAE9; border-radius:10px; padding:10px 12px; margin-top:4px; display:flex; align-items:center; justify-content:space-between; gap:8px">
+          <span style="font-size:.82rem; color:#B3261E">Excluir "${esc(draft.name)}"?</span>
+          <div style="display:flex; gap:6px; flex-shrink:0">
+            <button type="button" id="cancelDeleteMedBtn" style="background:none; border:none; padding:5px 8px; font-family:inherit; font-size:.78rem; color:var(--ink-muted); cursor:pointer">Cancelar</button>
+            <button type="button" id="confirmDeleteMedBtn" style="background:#B3261E; color:#fff; border:none; border-radius:7px; padding:5px 10px; font-family:inherit; font-size:.78rem; font-weight:600; cursor:pointer">Excluir</button>
+          </div>
+        </div>
+      ` : ''}
+      <div style="display:flex; gap:8px; margin-top:12px">
+        ${editingId? `<button type="button" class="btn-secondary" id="deleteMedBtn" style="color:#B3261E; padding:0 14px">${icon('trash',16,'#B3261E')}</button>` : ''}
         <button class="btn-secondary" id="cancelAdd" style="flex:1">Cancelar</button>
         <button class="btn-primary" id="confirmAdd" ${draft.name.trim()?'':'disabled'}>${editingId?'Salvar':'Adicionar'}</button>
       </div>
     </div>`;
     document.getElementById('d_name').addEventListener('input', e=>{ draft.name=e.target.value; document.getElementById('confirmAdd').disabled = !draft.name.trim(); });
     const deleteBtn = document.getElementById('deleteMedBtn');
-    if(deleteBtn) deleteBtn.addEventListener('click', ()=>{
-      if(!window.confirm(`Excluir "${draft.name}"? Essa ação não pode ser desfeita.`)) return;
+    if(deleteBtn) deleteBtn.addEventListener('click', ()=>{ confirmingDeleteId = editingId; renderAddArea(); });
+    const cancelDeleteBtn = document.getElementById('cancelDeleteMedBtn');
+    if(cancelDeleteBtn) cancelDeleteBtn.addEventListener('click', ()=>{ confirmingDeleteId = null; renderAddArea(); });
+    const confirmDeleteBtn = document.getElementById('confirmDeleteMedBtn');
+    if(confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', ()=>{
       list = list.filter(m=> m.id!==editingId);
-      adding=false; editingId=null;
+      adding=false; editingId=null; confirmingDeleteId=null;
       render();
     });
     document.querySelectorAll('[data-tipo]').forEach(b=> b.addEventListener('click', ()=>{ draft.tipo=b.dataset.tipo; renderAddArea(); }));
@@ -2104,7 +2118,7 @@ function openMedManager(onDone, jumpToId, startAdding){
         renderAddArea();
       }));
     }
-    document.getElementById('cancelAdd').addEventListener('click', ()=>{ adding=false; editingId=null; syncMedListVisibility(); renderAddArea(); });
+    document.getElementById('cancelAdd').addEventListener('click', ()=>{ adding=false; editingId=null; confirmingDeleteId=null; syncMedListVisibility(); renderAddArea(); });
     document.getElementById('confirmAdd').addEventListener('click', ()=>{
       if(submitting) return;
       const n = draft.name.trim(); if(!n) return;
