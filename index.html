@@ -1657,7 +1657,6 @@ function openCrecheModal(editingLanc){
   let form = null;
 
   function servicoOf(id){ return crecheServicos.find(s=>s.id===id) || null; }
-  function svcIcon(id){ return id==='hotel' ? 'calendar' : id==='banho' ? 'droplet' : id==='outro' ? 'plus' : 'home'; }
 
   function recalcHotelValor(){
     const servico = servicoOf('hotel');
@@ -1682,11 +1681,8 @@ function openCrecheModal(editingLanc){
 
   function selectorHtml(){
     const items = crecheServicos.map(s=>({id:s.id, nome:s.nome})).concat([{id:'outro', nome:'Outro'}]);
-    return `<div class="quick-grid" style="margin-bottom:20px">
-      ${items.map(it=> `<button type="button" data-svc="${it.id}">
-        <span class="icon-circle" style="background:${selectedSvc===it.id?cat.bgHex:'#EEF0F5'}">${icon(svcIcon(it.id),20,selectedSvc===it.id?cat.hex:'#3D4250')}</span>
-        <span class="lbl">${esc(it.nome)}</span>
-      </button>`).join('')}
+    return `<div class="pickgrid" style="justify-content:flex-start; margin-bottom:18px">
+      ${items.map(it=> `<button type="button" class="pick-btn ${selectedSvc===it.id?'sel':''}" style="${selectedSvc===it.id?`background:${cat.hex}`:''}" data-svc="${it.id}">${esc(it.nome)}</button>`).join('')}
     </div>`;
   }
 
@@ -1719,8 +1715,8 @@ function openCrecheModal(editingLanc){
           </div>
         </div>
         <div class="sheet-body">
-          ${lanc ? '' : selectorHtml()}
           ${lanc ? '' : `<button type="button" class="link-btn" id="openCrecheMgr" style="color:${cat.hex}; margin-bottom:16px">Ver mês / Gerenciar</button>`}
+          ${lanc ? '' : selectorHtml()}
           ${fieldsHtml()}
         </div>
         ${!fechado ? `<div class="sheet-foot">
