@@ -682,10 +682,12 @@ function onDemandMeds(){
 // vazio, mas tocável, pra marcar retroativamente. Lançamentos que não batem
 // com nenhum slot esperado (remédio já apagado do cadastro, etc.) continuam
 // aparecendo soltos, como sempre apareceram, só que sem like de "esperado".
-function pastMedGroupHtml(dayKey, dateStr, remedioEntries, forceOpen){
+function pastMedGroupHtml(dayKey, dateStr, remedioEntries, searchQuery){
   const slots = pendingSlotsForDate(dateStr);
   if(slots.length===0 && remedioEntries.length===0) return '';
-  const isOpen = forceOpen || expandedMedGroups.has(dayKey);
+  const q = normalizeSearch(searchQuery||'');
+  const matchesSearch = q!=='' && (slots.some(s=> normalizeSearch(s.med.name).includes(q)) || remedioEntries.some(e=> normalizeSearch(e.title).includes(q)));
+  const isOpen = matchesSearch || expandedMedGroups.has(dayKey);
 
   const usedEntryIds = new Set();
   const slotRows = slots.map(s=>{
@@ -966,7 +968,7 @@ function renderTimeline(){
         // o que foi dado, independente do texto buscado — a busca não pode
         // fazer remédio já dado parecer que não foi.
         const dayRemedioEntries = entries.filter(e=> e.category==='remedio' && new Date(e.date).toDateString()===day.key);
-        pendingHtml = pastMedGroupHtml(day.key, dayDateStr, dayRemedioEntries, isSearching);
+        pendingHtml = pastMedGroupHtml(day.key, dayDateStr, dayRemedioEntries, search);
       }
       if(day.items.length===0 && !pendingHtml) continue;
       const dayNum = fmtDay(refDate);
