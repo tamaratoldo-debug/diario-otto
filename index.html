@@ -1224,10 +1224,10 @@ function openEntryModal(category, editId){
           </button>`;
         };
         h += `<div class="field">
+          <button type="button" class="link-btn" id="openMedMgr" style="color:${cat.hex}; margin-bottom:12px">+ Gerenciar remédios</button>
           ${scheduled.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Horário fixo</label><div class="pickgrid" id="medPickScheduled" style="justify-content:flex-start; margin-bottom:16px">${scheduled.map(cardHtml).join('')}</div>` : ''}
           ${onDemand.length? `<label style="display:block; font-size:.72rem; color:var(--ink-muted); font-weight:600; margin-bottom:6px">Sob demanda</label><div class="pickgrid" id="medPickOnDemand" style="justify-content:flex-start">${onDemand.map(cardHtml).join('')}</div>` : ''}
           ${meds.length===0? '<span class="hint">Nenhum remédio cadastrado ainda.</span>' : ''}
-          <button type="button" class="link-btn" id="openMedMgr" style="color:${cat.hex}; margin-top:8px">+ Gerenciar remédios</button>
         </div>`;
       } else {
         h += `<div class="field"><label>Remédio</label>
@@ -2061,13 +2061,12 @@ function openMedManager(onDone, jumpToId, startAdding){
           ${draft.horarios.map((h,i)=>`<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:${CATEGORIES.remedio.hex}18; border-radius:8px; padding:7px 8px 7px 12px">
             <span style="font-size:.85rem; font-weight:600; color:${CATEGORIES.remedio.hex}">${h.time}${h.dose?' · '+esc(h.dose):''}</span>
             <button type="button" data-rm-horario="${i}" style="background:none; border:none; padding:2px; display:flex; color:${CATEGORIES.remedio.hex}">${icon('x',13,CATEGORIES.remedio.hex)}</button>
-          </div>`).join('') || '<span class="hint">Nenhum horário adicionado ainda.</span>'}
+          </div>`).join('')}
         </div>
         <div style="display:flex; gap:8px; align-items:flex-end">
           <div style="flex:1">${dtField('d_horario_new','time','')}</div>
           <div style="flex:1"><input id="d_horario_dose" autocomplete="off" placeholder="dose (opcional)" style="width:100%; padding:11px 12px; border-radius:10px; border:1px solid #E5E0D4; font-family:inherit; font-size:.9rem; box-sizing:border-box"/></div>
         </div>
-        <button type="button" class="btn-secondary" id="addHorarioBtn" style="width:100%; margin-top:8px">Adicionar horário</button>
       </div>` : ''}
       ${editingId && confirmingDeleteId===editingId? `
         <div style="background:#FBEAE9; border-radius:10px; padding:10px 12px; margin-top:4px; display:flex; align-items:center; justify-content:space-between; gap:8px">
@@ -2101,19 +2100,20 @@ function openMedManager(onDone, jumpToId, startAdding){
     const doseInput = document.getElementById('d_dose');
     if(doseInput) doseInput.addEventListener('input', e=> draft.dose=e.target.value);
     if(isScheduled){
-      let newHorarioVal = '';
-      wireDtField('d_horario_new', v=> newHorarioVal=v);
-      document.getElementById('addHorarioBtn').addEventListener('click', ()=>{
-        if(!newHorarioVal) return;
-        const doseVal = document.getElementById('d_horario_dose').value.trim();
-        if(draft.horarios.some(h=>h.time===newHorarioVal)){
-          draft.horarios = draft.horarios.map(h=> h.time===newHorarioVal ? {time:newHorarioVal, dose:doseVal} : h);
+      function commitHorarioFromInputs(){
+        const v = document.getElementById('d_horario_new').value;
+        if(!v) return;
+        const doseVal = (document.getElementById('d_horario_dose').value || '').trim();
+        if(draft.horarios.some(h=>h.time===v)){
+          draft.horarios = draft.horarios.map(h=> h.time===v ? {time:v, dose:doseVal} : h);
         } else {
-          draft.horarios.push({time:newHorarioVal, dose:doseVal});
+          draft.horarios.push({time:v, dose:doseVal});
         }
         draft.horarios.sort((a,b)=> a.time.localeCompare(b.time));
         renderAddArea();
-      });
+      }
+      wireDtField('d_horario_new', v=>{ if(v) commitHorarioFromInputs(); });
+      document.getElementById('d_horario_dose').addEventListener('blur', ()=> commitHorarioFromInputs());
       document.querySelectorAll('[data-rm-horario]').forEach(b=> b.addEventListener('click', ()=>{
         draft.horarios.splice(Number(b.dataset.rmHorario),1);
         renderAddArea();
