@@ -250,6 +250,8 @@ const ICONS = {
   home:'<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
   chevronDown:'<path d="m6 9 6 6 6-6"/>',
   chevronUp:'<path d="m18 15-6-6-6 6"/>',
+  chevronLeft:'<path d="m15 18-6-6 6-6"/>',
+  chevronRight:'<path d="m9 18 6-6-6-6"/>',
   x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
   trash:'<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/>',
   pencil:'<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497Z"/><path d="m15 5 4 4"/>',
@@ -1718,6 +1720,7 @@ function openCrecheModal(editingLanc){
         </div>
         <div class="sheet-body">
           ${lanc ? '' : selectorHtml()}
+          ${lanc ? '' : `<button type="button" class="link-btn" id="openCrecheMgr" style="color:${cat.hex}; margin-bottom:16px">Ver mês / Gerenciar</button>`}
           ${fieldsHtml()}
         </div>
         ${!fechado ? `<div class="sheet-foot">
@@ -1734,6 +1737,8 @@ function openCrecheModal(editingLanc){
     document.getElementById('btnCloseCreche').addEventListener('click', closeModal);
     const cancelBtn = document.getElementById('btnCancelCreche');
     if(cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    const mgrBtn = document.getElementById('openCrecheMgr');
+    if(mgrBtn) mgrBtn.addEventListener('click', ()=>{ closeModal(); openCrecheManager(); });
     if(!lanc){
       host.querySelectorAll('[data-svc]').forEach(b=> b.addEventListener('click', ()=>{
         selectedSvc = b.dataset.svc; initForm(); render();
@@ -1785,6 +1790,107 @@ function openCrecheModal(editingLanc){
       persistCrecheLancamentos(); persistEntries();
       closeModal(); renderAll();
     }
+  }
+
+  render();
+}
+
+function openCrecheManager(){
+  const host = document.getElementById('modalHost');
+  const cat = CATEGORIES.creche;
+  let monthKey = todayStr().slice(0,7);
+  let copiedFeedback = false;
+
+  function lancamentosDoMes(){ return crecheLancamentos.filter(l=> l.data.slice(0,7)===monthKey).sort((a,b)=> a.data.localeCompare(b.data)); }
+  function totalDoMes(){ return lancamentosDoMes().reduce((s,l)=> s+l.valor, 0); }
+  function fechado(){ return !!crecheFechados[monthKey]; }
+  function monthLabel(){ const [y,m] = monthKey.split('-').map(Number); return fmtMonthYear(new Date(y, m-1, 1)); }
+  function shiftMonth(delta){ const [y,m] = monthKey.split('-').map(Number); const d = new Date(y, m-1+delta, 1); monthKey = `${d.getFullYear()}-${pad(d.getMonth()+1)}`; }
+  function fmtDDMM(ds){ const [,m,d] = ds.split('-'); return `${d}/${m}`; }
+
+  function resumoTexto(){
+    const list = lancamentosDoMes();
+    const linhas = list.map(l=>{
+      const periodo = l.dataSaida ? `${fmtDDMM(l.data)} a ${fmtDDMM(l.dataSaida)}` : fmtDDMM(l.data);
+      const obs = l.obs ? ` - ${l.obs}` : '';
+      return `${periodo} - ${l.servicoNome}: R$ ${fmtValorBR(l.valor)}${obs}`;
+    });
+    return `${monthLabel()}\n${linhas.join('\n')}\n\nTotal: R$ ${fmtValorBR(totalDoMes())}`;
+  }
+
+  function itemHtml(l){
+    const periodo = l.dataSaida ? `${fmtDDMM(l.data)} a ${fmtDDMM(l.dataSaida)}` : fmtDDMM(l.data);
+    return `<div class="manager-item" data-open="${l.id}" style="cursor:pointer">
+      <div><div class="name">${esc(l.servicoNome)}${l.obs?' · '+esc(l.obs):''}</div><div class="sub">${periodo}</div></div>
+      <div style="font-weight:600; font-size:.85rem">R$ ${fmtValorBR(l.valor)}</div>
+    </div>`;
+  }
+
+  function precosHtml(){
+    return crecheServicos.map(s=> `<div class="field" style="margin-bottom:8px">
+      <label>${esc(s.nome)}${s.id==='hotel'?' (por diária)':''}</label>
+      <input inputmode="decimal" data-preco="${s.id}" value="${fmtValorBR(s.valor)}"/>
+    </div>`).join('');
+  }
+
+  function render(){
+    const list = lancamentosDoMes();
+    const fech = fechado();
+    host.innerHTML = `<div class="overlay" id="ovCrMgr">
+      <div class="sheet" style="max-height:90vh">
+        <div class="sheet-head">
+          <div class="sheet-title" style="color:${cat.hex}">${icon(cat.icon,17,cat.hex)}<span style="color:var(--ink)">Gerenciar creche</span></div>
+          <button class="icon-btn" id="btnCloseMgr">${icon('x',18)}</button>
+        </div>
+        <div class="sheet-body">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px">
+            <button class="icon-btn" id="prevMonth">${icon('chevronLeft',16)}</button>
+            <div style="font-weight:600; font-size:.9rem">${monthLabel()}</div>
+            <button class="icon-btn" id="nextMonth">${icon('chevronRight',16)}</button>
+          </div>
+          <div style="text-align:center; margin-bottom:18px">
+            <div class="hint" style="text-transform:uppercase; letter-spacing:.03em">${fech?'Total do mês (pago)':'Total do mês'}</div>
+            <div class="display" style="font-size:1.6rem; font-weight:700; margin-top:2px">R$ ${fmtValorBR(totalDoMes())}</div>
+          </div>
+          ${list.length? list.map(itemHtml).join('') : '<div class="hint" style="text-align:center; padding:10px 0 18px">Nada lançado neste mês.</div>'}
+          <div style="display:flex; gap:8px; margin:16px 0">
+            <button class="btn-secondary" id="btnCopiarResumo" style="flex:1">${copiedFeedback?'Copiado!':'Copiar resumo'}</button>
+            <button class="${fech?'btn-secondary':'btn-primary'}" id="btnToggleFechado" style="flex:1">${fech?'Reabrir mês':'Fechar mês'}</button>
+          </div>
+          <div class="month-label" style="margin:22px 0 10px">Preços padrão</div>
+          ${precosHtml()}
+        </div>
+      </div>
+    </div>`;
+    wire();
+  }
+
+  function wire(){
+    document.getElementById('ovCrMgr').addEventListener('click', e=>{ if(e.target.id==='ovCrMgr') closeModal(); });
+    document.getElementById('btnCloseMgr').addEventListener('click', closeModal);
+    document.getElementById('prevMonth').addEventListener('click', ()=>{ shiftMonth(-1); copiedFeedback=false; render(); });
+    document.getElementById('nextMonth').addEventListener('click', ()=>{ shiftMonth(1); copiedFeedback=false; render(); });
+    host.querySelectorAll('[data-open]').forEach(row=> row.addEventListener('click', ()=>{
+      const lanc = crecheLancamentos.find(l=> l.id===row.dataset.open);
+      if(lanc){ closeModal(); openCrecheModal(lanc); }
+    }));
+    document.getElementById('btnCopiarResumo').addEventListener('click', async ()=>{
+      try{
+        await navigator.clipboard.writeText(resumoTexto());
+        copiedFeedback = true; render();
+        setTimeout(()=>{ copiedFeedback=false; const b=document.getElementById('btnCopiarResumo'); if(b) b.textContent='Copiar resumo'; }, 2000);
+      }catch(err){ showWarning('Não consegui copiar. Tente novamente.'); }
+    });
+    document.getElementById('btnToggleFechado').addEventListener('click', ()=>{
+      if(fechado()) delete crecheFechados[monthKey]; else crecheFechados[monthKey] = true;
+      persistCrecheFechados(); render();
+    });
+    host.querySelectorAll('[data-preco]').forEach(inp=>{
+      inp.addEventListener('change', ()=>{
+        const s = crecheServicos.find(x=>x.id===inp.dataset.preco);
+        if(s){ s.valor = parseValorBR(inp.value); persistCrecheServicos(); inp.value = fmtValorBR(s.valor); }
+      });
+    });
   }
 
   render();
