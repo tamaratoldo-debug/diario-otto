@@ -2058,8 +2058,8 @@ function openConfirmDeleteCrecheLanc(id){
 // ================= SETTINGS MODAL =================
 function openReport(){
   const host = document.getElementById('modalHost');
-  let start = (()=>{ const d=new Date(); d.setDate(d.getDate()-29); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })();
-  let end = todayStr();
+  let start = '';
+  let end = '';
 
   function dayKeyOf(iso){ const d=new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
   function dateRangeArray(s,e){
@@ -2175,8 +2175,8 @@ function openReport(){
 
     host.innerHTML = `<div class="rep-overlay" id="repDocHost">
       <div class="rep-bar">
-        <button class="icon-btn" id="repBack">${icon('x',18)}</button>
         <button class="btn-primary" id="repPrint" style="padding:8px 16px; font-size:.8rem">Imprimir / Salvar PDF</button>
+        <button class="icon-btn" id="repBack">${icon('x',18)}</button>
       </div>
       <div class="rep-doc">
         <h1 class="rep-h1">Relatório de saúde — Otto</h1>
