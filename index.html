@@ -826,6 +826,7 @@ function renderFilters(){
   ).join('');
   host.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
     filter = (filter===b.dataset.f) ? 'todos' : b.dataset.f;
+    expandedDays.clear();
     renderTimeline(); renderFilters();
   }));
 }
@@ -966,7 +967,7 @@ function renderTimeline(){
       if(day.items.length===0 && !pendingHtml) continue;
       const dayNum = fmtDay(refDate);
       const weekday = fmtWeekdayShort(refDate);
-      const isExpanded = isSearching ? true : expandedDays.has(day.key);
+      const isExpanded = (isSearching || filter!=='todos') ? true : expandedDays.has(day.key);
 
       squaresHtml += `<button class="day-square${isExpanded?' active':''}" data-daysquare="${esc(day.key)}">
         <div class="ds-n">${dayNum}</div>
