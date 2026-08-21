@@ -2538,7 +2538,7 @@ function openMedManager(onDone, jumpToId, startAdding){
         <button data-tipo="sob-demanda" class="${draft.tipo==='sob-demanda'?'sel':''}">Sob demanda</button>
       </div></div>
       ${(editingId && !isNewDraft && draft.tipo==='continuo' && !draft.encerradoEm) ? `
-        <button type="button" id="togglePauseBtn" class="btn-secondary" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:14px">${draft.pausadoDesde? icon('play',14)+' Retomar' : icon('pause',14)+' Pausar'}</button>
+        <button type="button" id="togglePauseBtn" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:14px; padding:9px 6px; font-size:.78rem; font-weight:600; border-radius:8px; border:none; background:#F1EEE6; color:var(--ink); cursor:pointer; font-family:inherit">${draft.pausadoDesde? icon('play',13)+' Retomar' : icon('pause',13)+' Pausar'}</button>
       ` : ''}
       ${draft.encerradoEm? `<div class="hint" style="margin:-6px 0 14px">Encerrado em ${fmtDateShort(draft.encerradoEm)}.</div>` : ''}
       ${draft.tipo==='pontual'? `
