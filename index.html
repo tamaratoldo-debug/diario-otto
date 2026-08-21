@@ -1092,7 +1092,7 @@ async function exportBackup(silent){
 // dispara quando a pessoa toca — mas essa caixa do Safari ainda aparece
 // nesse momento, isso é do sistema e não dá pra evitar.
 const AUTO_BACKUP_INTERVAL_MS = 12*60*60*1000; // 12h
-let backupBannerDismissedAt = 0;
+let backupBannerLastShownAt = store.get('otto:backupBannerLastShownAt', 0);
 function hideBackupBanner(){
   const el = document.getElementById('backupBannerHost');
   if(el) el.innerHTML = '';
@@ -1100,16 +1100,18 @@ function hideBackupBanner(){
 function checkBackupBanner(){
   const last = settings.lastAutoBackupAt ? new Date(settings.lastAutoBackupAt).getTime() : 0;
   if(Date.now() - last < AUTO_BACKUP_INTERVAL_MS) return;
-  if(Date.now() - backupBannerDismissedAt < 60*60*1000) return; // se dispensou, não insiste na mesma hora
+  if(Date.now() - backupBannerLastShownAt < 24*60*60*1000) return; // no máximo 1x por dia
   const host = document.getElementById('backupBannerHost');
   if(!host) return;
+  backupBannerLastShownAt = Date.now();
+  writeStore('otto:backupBannerLastShownAt', backupBannerLastShownAt);
   host.innerHTML = `<div class="warning-fixed" style="top:calc(64px + env(safe-area-inset-top))"><div class="warning-banner" style="background:#EEF0F5; border-color:#D6DAE6; color:#3D4250; align-items:center">
     <div style="flex:1">Faz um tempo que não tem backup. Quer fazer agora?</div>
     <button id="backupNowBtn" style="background:var(--ink); color:#fff; border-radius:8px; padding:5px 10px; font-size:.72rem; font-weight:600; flex-shrink:0">Fazer backup</button>
     <button id="backupDismissBtn" style="flex-shrink:0">${icon('x',14,'#3D4250')}</button>
   </div></div>`;
   document.getElementById('backupNowBtn').addEventListener('click', ()=> exportBackup(false));
-  document.getElementById('backupDismissBtn').addEventListener('click', ()=>{ backupBannerDismissedAt = Date.now(); hideBackupBanner(); });
+  document.getElementById('backupDismissBtn').addEventListener('click', hideBackupBanner);
 }
 
 async function importBackup(file){
@@ -1167,16 +1169,18 @@ function pesoChartHtml(){
   const vals = pesoEntries.map(e=>e.value);
   const min = Math.min(...vals), max = Math.max(...vals);
   const range = (max-min)||1;
-  const w=400,h=140,chartPad=10,topPad=20;
+  const w=400,h=160,sidePad=14,topPad=20,bottomPad=22;
   const pts = pesoEntries.map((e,i)=>{
-    const x = chartPad + (i/(pesoEntries.length-1||1))*(w-2*chartPad);
-    const y = topPad + (h-topPad-chartPad) - ((e.value-min)/range)*(h-topPad-chartPad);
-    return [x,y,e.value];
+    const x = sidePad + (i/(pesoEntries.length-1||1))*(w-2*sidePad);
+    const y = topPad + (h-topPad-bottomPad) - ((e.value-min)/range)*(h-topPad-bottomPad);
+    const d = new Date(e.date);
+    return [x,y,e.value,`${pad(d.getDate())}/${pad(d.getMonth()+1)}`];
   });
   const path = pts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
   const dots = pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${CATEGORIES.peso.hex}"/>`).join('');
-  const labels = pts.map(p=>`<text x="${p[0].toFixed(1)}" y="${(p[1]-8).toFixed(1)}" font-size="11" text-anchor="middle" fill="var(--ink-muted)">${p[2]}</text>`).join('');
-  return `<div class="field"><label>Evolução do peso</label><div class="chart-wrap"><svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="${CATEGORIES.peso.hex}" stroke-width="2"/>${dots}${labels}</svg></div></div>`;
+  const valueLabels = pts.map(p=>`<text x="${p[0].toFixed(1)}" y="${(p[1]-8).toFixed(1)}" font-size="11" text-anchor="middle" fill="var(--ink-muted)">${p[2]}</text>`).join('');
+  const dateLabels = pts.map(p=>`<text x="${p[0].toFixed(1)}" y="${(p[1]+16).toFixed(1)}" font-size="9" text-anchor="middle" fill="var(--ink-muted)">${p[3]}</text>`).join('');
+  return `<div class="field"><label>Evolução do peso</label><div class="chart-wrap"><svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="${CATEGORIES.peso.hex}" stroke-width="2"/>${dots}${valueLabels}${dateLabels}</svg></div></div>`;
 }
 
 function emptyForm(cat){
