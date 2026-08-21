@@ -2419,7 +2419,7 @@ function openMedManager(onDone, jumpToId, startAdding){
     const itemHtml = m=> `<div class="manager-item" data-open="${m.id}" style="cursor:pointer; ${(m.pausadoDesde||m.encerradoEm)?'opacity:.55':''}"><div><div class="name">${esc(m.name)}</div><div class="sub">${medSubLabel(m)}</div></div><button class="del-btn" data-id="${m.id}">${icon('trash',14,'var(--ink-muted)')}</button></div>`;
     host.innerHTML = `<div class="overlay" id="ovMed">
       <div class="sheet" style="max-height:90vh">
-        <div class="sheet-head"><div class="sheet-title">Remédios atuais</div></div>
+        <div class="sheet-head"><div class="sheet-title">${icon('pill',17,CATEGORIES.remedio.hex)}<span>Remédios atuais</span></div><button class="icon-btn" id="closeMed">${icon('x',18)}</button></div>
         <div class="sheet-body">
           <div id="addArea"></div>
           <div id="medList" style="${adding?'display:none':''}">
@@ -2433,6 +2433,7 @@ function openMedManager(onDone, jumpToId, startAdding){
     </div>`;
     document.getElementById('ovMed').addEventListener('click', e=>{ if(e.target.id==='ovMed') finish(); });
     document.getElementById('doneMedBtn').addEventListener('click', finish);
+    document.getElementById('closeMed').addEventListener('click', finish);
     document.querySelectorAll('#medList .del-btn').forEach(b=> b.addEventListener('click', (ev)=>{
       ev.stopPropagation();
       const m = list.find(x=>x.id===b.dataset.id);
