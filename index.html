@@ -2596,6 +2596,7 @@ function openMedManager(onDone, jumpToId, startAdding){
     if(togglePauseBtn) togglePauseBtn.addEventListener('click', ()=>{
       draft.pausadoDesde = draft.pausadoDesde ? '' : todayStr();
       syncDraftToList();
+      meds = list; persistMeds(); renderTimeline();
       renderAddArea();
     });
     const encerrarBtn = document.getElementById('encerrarMedBtn');
@@ -2608,6 +2609,7 @@ function openMedManager(onDone, jumpToId, startAdding){
       draft.pausadoDesde = '';
       confirmingEncerrar = false;
       syncDraftToList();
+      meds = list; persistMeds(); renderTimeline();
       renderAddArea();
     });
     wireDtField('d_inicio', v=>{ draft.dataInicio=v; syncDraftToList(); });
