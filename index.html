@@ -2118,7 +2118,6 @@ function openReport(){
     const days = dateRangeArray(start,end);
     const inRange = entries.filter(e=> { const ds=dayKeyOf(e.date); return ds>=start && ds<=end; });
     const pesoEntries = inRange.filter(e=>e.category==='peso').slice().sort((a,b)=> new Date(a.date)-new Date(b.date));
-    const continuos = meds.filter(m=> m.tipo==='continuo');
 
     const medRows = meds.slice().sort(sortMedsByName).map(m=>{
       const horarios = m.tipo==='sob-demanda'
@@ -2132,13 +2131,18 @@ function openReport(){
       const dayEntries = inRange.filter(e=> dayKeyOf(e.date)===ds);
       if(dayEntries.length===0) return '';
       const remedios = [...new Set(dayEntries.filter(e=>e.category==='remedio').map(e=>e.title))];
-      const givenSlots = new Set(dayEntries.filter(e=>e.category==='remedio' && e.medId).map(e=> e.medId+'|'+(e.horarioSlot||'')));
+      const remedioEntriesDay = dayEntries.filter(e=>e.category==='remedio');
+      const daySlots = pendingSlotsForDate(ds);
+      const usedIds = new Set();
       const naoAdmin = [];
-      continuos.forEach(m=>{
-        const horarios = (m.horarios&&m.horarios.length) ? m.horarios : [{time:'', dose:''}];
-        horarios.forEach(h=>{
-          if(!givenSlots.has(m.id+'|'+h.time)) naoAdmin.push(h.time ? `${m.name} (${h.time})` : m.name);
-        });
+      daySlots.forEach(s=>{
+        const sameMed = e=> (e.medId && e.medId===s.med.id) || (!e.medId && e.title && normalizeSearch(e.title)===normalizeSearch(s.med.name));
+        let match = remedioEntriesDay.find(e=> !usedIds.has(e.id) && sameMed(e) && (e.horarioSlot||'')===(s.horario||''));
+        if(!match && s.horario){
+          match = remedioEntriesDay.find(e=> !usedIds.has(e.id) && sameMed(e) && !e.horarioSlot && fmtTime(e.date)===s.horario);
+        }
+        if(match) usedIds.add(match.id);
+        else naoAdmin.push(s.horario ? `${s.med.name} (${s.horario})` : s.med.name);
       });
       const alimentacao = dayEntries.filter(e=>e.category==='alimentacao')
         .map(e=> `${fmtTime(e.date)} — ${esc(e.title)}${entrySubtitle(e)?` (${esc(entrySubtitle(e))})`:''}`).join('<br/>');
