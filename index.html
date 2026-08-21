@@ -1267,9 +1267,12 @@ function openEntryModal(category, editId){
           </button>`;
         };
         const scheduledRowHtml = m=>{
-          const tipoLabel = m.tipo==='continuo' ? 'Contínuo' : `Até ${fmtDateShort(m.dataFim)}`;
+          let tipoLabel;
+          if(m.tipo==='continuo' && m.encerradoEm) tipoLabel = `Encerrado em ${fmtDateShort(m.encerradoEm)}`;
+          else if(m.tipo==='continuo' && m.pausadoDesde) tipoLabel = `Pausado desde ${fmtDateShort(m.pausadoDesde)}`;
+          else tipoLabel = m.tipo==='continuo' ? 'Contínuo' : `Até ${fmtDateShort(m.dataFim)}`;
           const horarios = (m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : (m.dose?esc(m.dose):'');
-          return `<div class="med-pick-btn" style="display:block; width:100%; text-align:left; padding:9px 12px; opacity:.6">
+          return `<div class="med-pick-btn" style="display:block; width:100%; text-align:left; padding:9px 12px; opacity:${(m.pausadoDesde||m.encerradoEm)?'.4':'.6'}">
               <div class="mp-name">${esc(m.name)}</div>
               <div class="mp-sub">${tipoLabel}${horarios?' · '+horarios:''}</div>
           </div>`;
@@ -2538,7 +2541,19 @@ function openMedManager(onDone, jumpToId, startAdding){
         <button data-tipo="sob-demanda" class="${draft.tipo==='sob-demanda'?'sel':''}">Sob demanda</button>
       </div></div>
       ${(editingId && !isNewDraft && draft.tipo==='continuo' && !draft.encerradoEm) ? `
-        <button type="button" id="togglePauseBtn" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:14px; padding:9px 6px; font-size:.78rem; font-weight:600; border-radius:8px; border:none; background:#F1EEE6; color:var(--ink); cursor:pointer; font-family:inherit">${draft.pausadoDesde? icon('play',13)+' Retomar' : icon('pause',13)+' Pausar'}</button>
+        <div style="display:flex; gap:8px; margin-bottom:14px">
+          <button type="button" id="togglePauseBtn" style="flex:1; display:flex; align-items:center; justify-content:center; gap:6px; padding:9px 6px; font-size:.78rem; font-weight:600; border-radius:8px; border:none; background:#F1EEE6; color:var(--ink); cursor:pointer; font-family:inherit">${draft.pausadoDesde? icon('play',13)+' Retomar' : icon('pause',13)+' Pausar'}</button>
+          <button type="button" id="encerrarMedBtn" style="flex:1; padding:9px 6px; font-size:.78rem; font-weight:600; border-radius:8px; border:none; background:#F1EEE6; color:var(--ink-muted); cursor:pointer; font-family:inherit">Encerrar</button>
+        </div>
+        ${confirmingEncerrar? `
+          <div style="background:#F1EEE6; border-radius:10px; padding:10px 12px; margin:-6px 0 14px; display:flex; flex-direction:column; gap:8px">
+            <span style="font-size:.82rem; color:var(--ink)">Isso encerra "${esc(draft.name)}" hoje. Pra retomar depois, você cadastra ele de novo. Confirmar?</span>
+            <div style="display:flex; gap:6px; justify-content:flex-end">
+              <button type="button" id="cancelEncerrarBtn" style="background:none; border:none; padding:5px 8px; font-family:inherit; font-size:.78rem; color:var(--ink-muted); cursor:pointer">Cancelar</button>
+              <button type="button" id="confirmEncerrarBtn" style="background:var(--ink); color:#fff; border:none; border-radius:7px; padding:5px 10px; font-family:inherit; font-size:.78rem; font-weight:600; cursor:pointer">Encerrar</button>
+            </div>
+          </div>
+        ` : ''}
       ` : ''}
       ${draft.encerradoEm? `<div class="hint" style="margin:-6px 0 14px">Encerrado em ${fmtDateShort(draft.encerradoEm)}.</div>` : ''}
       ${draft.tipo==='pontual'? `
@@ -2559,16 +2574,6 @@ function openMedManager(onDone, jumpToId, startAdding){
         </div>
       </div>` : ''}
       ${nameConflict()? `<div class="hint" style="color:#B3261E; margin-top:-6px">Já existe um remédio chamado "${esc(draft.name.trim())}".</div>` : ''}
-      ${(editingId && !isNewDraft && draft.tipo==='continuo' && !draft.encerradoEm) ? `<button type="button" class="link-btn" id="encerrarMedBtn" style="color:var(--ink-muted); margin-top:6px">Encerrar este remédio</button>` : ''}
-      ${confirmingEncerrar? `
-        <div style="background:#F1EEE6; border-radius:10px; padding:10px 12px; margin-top:10px; display:flex; flex-direction:column; gap:8px">
-          <span style="font-size:.82rem; color:var(--ink)">Isso encerra "${esc(draft.name)}" hoje. Pra retomar depois, você cadastra ele de novo. Confirmar?</span>
-          <div style="display:flex; gap:6px; justify-content:flex-end">
-            <button type="button" id="cancelEncerrarBtn" style="background:none; border:none; padding:5px 8px; font-family:inherit; font-size:.78rem; color:var(--ink-muted); cursor:pointer">Cancelar</button>
-            <button type="button" id="confirmEncerrarBtn" style="background:var(--ink); color:#fff; border:none; border-radius:7px; padding:5px 10px; font-family:inherit; font-size:.78rem; font-weight:600; cursor:pointer">Encerrar</button>
-          </div>
-        </div>
-      ` : ''}
       ${editingId && confirmingDeleteId===editingId? `
         <div style="background:#FBEAE9; border-radius:10px; padding:10px 12px; margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:8px">
           <span style="font-size:.82rem; color:#B3261E">Excluir "${esc(draft.name)}"?</span>
