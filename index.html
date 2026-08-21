@@ -954,12 +954,14 @@ function renderTimeline(){
         pendingHtml = pendingRowsHtml(activeSlotsToday, adHocMedEntriesToday);
       } else {
         day.items = day.items.filter(e=> e.category!=='remedio');
-        const dayDateStr = toLocalDateStr(new Date(day.key));
-        // Sempre usa os lançamentos completos (entries, não list) pra decidir
-        // o que foi dado, independente do texto buscado — a busca não pode
-        // fazer remédio já dado parecer que não foi.
-        const dayRemedioEntries = entries.filter(e=> e.category==='remedio' && new Date(e.date).toDateString()===day.key);
-        pendingHtml = pastMedGroupHtml(day.key, dayDateStr, dayRemedioEntries, search);
+        if(showPending){
+          const dayDateStr = toLocalDateStr(new Date(day.key));
+          // Sempre usa os lançamentos completos (entries, não list) pra decidir
+          // o que foi dado, independente do texto buscado — a busca não pode
+          // fazer remédio já dado parecer que não foi.
+          const dayRemedioEntries = entries.filter(e=> e.category==='remedio' && new Date(e.date).toDateString()===day.key);
+          pendingHtml = pastMedGroupHtml(day.key, dayDateStr, dayRemedioEntries, search);
+        }
       }
       if(day.items.length===0 && !pendingHtml) continue;
       const dayNum = fmtDay(refDate);
