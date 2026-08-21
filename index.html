@@ -179,11 +179,6 @@
     <div class="quick-grid" id="quickActions"></div>
   </div>
 
-  <div class="card section" id="chartSection" style="display:none">
-    <div class="section-title" style="margin-bottom:8px">Evolução do peso</div>
-    <div class="chart-wrap"><svg id="chartSvg" width="100%" height="130" viewBox="0 0 400 130" preserveAspectRatio="none"></svg></div>
-  </div>
-
   <div style="margin-top:20px; padding:0 4px">
     <div style="display:flex; align-items:center; gap:8px">
       <button id="searchToggleBtn" style="flex-shrink:0; width:34px; height:34px; border-radius:50%; border:1px solid #E2E4EA; background:transparent; display:flex; align-items:center; justify-content:center">
@@ -606,23 +601,6 @@ function renderHero(){
     </div>
   `;
   document.getElementById('btnSettings').addEventListener('click', openSettings);
-
-  const chartSection = document.getElementById('chartSection');
-  if(pesoEntries.length>=2){
-    chartSection.style.display='block';
-    const vals = pesoEntries.map(e=>e.value);
-    const min = Math.min(...vals), max = Math.max(...vals);
-    const range = (max-min)||1;
-    const w=400,h=130,chartPad=10;
-    const pts = pesoEntries.map((e,i)=>{
-      const x = chartPad + (i/(pesoEntries.length-1||1))*(w-2*chartPad);
-      const y = h-chartPad - ((e.value-min)/range)*(h-2*chartPad);
-      return [x,y];
-    });
-    const path = pts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
-    const dots = pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${CATEGORIES.peso.hex}"/>`).join('');
-    document.getElementById('chartSvg').innerHTML = `<path d="${path}" fill="none" stroke="${CATEGORIES.peso.hex}" stroke-width="2"/>${dots}`;
-  } else chartSection.style.display='none';
 }
 
 // ---------- render: quick actions ----------
@@ -1183,6 +1161,24 @@ async function importBackup(file){
 }
 
 // ================= ENTRY MODAL =================
+function pesoChartHtml(){
+  const pesoEntries = entries.filter(e=>e.category==='peso').slice().sort((a,b)=> new Date(a.date)-new Date(b.date));
+  if(pesoEntries.length<2) return '';
+  const vals = pesoEntries.map(e=>e.value);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = (max-min)||1;
+  const w=400,h=140,chartPad=10,topPad=20;
+  const pts = pesoEntries.map((e,i)=>{
+    const x = chartPad + (i/(pesoEntries.length-1||1))*(w-2*chartPad);
+    const y = topPad + (h-topPad-chartPad) - ((e.value-min)/range)*(h-topPad-chartPad);
+    return [x,y,e.value];
+  });
+  const path = pts.map((p,i)=> (i===0?'M':'L')+p[0].toFixed(1)+','+p[1].toFixed(1)).join(' ');
+  const dots = pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${CATEGORIES.peso.hex}"/>`).join('');
+  const labels = pts.map(p=>`<text x="${p[0].toFixed(1)}" y="${(p[1]-8).toFixed(1)}" font-size="11" text-anchor="middle" fill="var(--ink-muted)">${p[2]}</text>`).join('');
+  return `<div class="field"><label>Evolução do peso</label><div class="chart-wrap"><svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="${CATEGORIES.peso.hex}" stroke-width="2"/>${dots}${labels}</svg></div></div>`;
+}
+
 function emptyForm(cat){
   const now = new Date();
   const timeDefault = cat==='procedimento' ? '' : `${pad(now.getHours())}:${pad(now.getMinutes())}`;
@@ -1285,7 +1281,7 @@ function openEntryModal(category, editId){
       }
     }
     if(category==='peso'){
-      h += `<div class="field"><label>Peso (kg)</label><input id="f_value" type="number" step="0.1" value="${esc(String(form.value))}" placeholder="ex: 8.4"/></div>`;
+      h += `${pesoChartHtml()}<div class="field"><label>Peso (kg)</label><input id="f_value" type="number" step="0.1" value="${esc(String(form.value))}" placeholder="ex: 8.4"/></div>`;
     }
     if(category==='intercorrencia'){
       h += `<div class="field"><label>O que aconteceu</label><input id="f_title" value="${esc(form.title)}" placeholder="ex: Vômito, coceira..."/>
