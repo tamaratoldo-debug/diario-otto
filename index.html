@@ -1271,7 +1271,7 @@ function openEntryModal(category, editId){
           if(m.tipo==='continuo' && m.encerradoEm) tipoLabel = `Encerrado em ${fmtDateShort(m.encerradoEm)}`;
           else if(m.tipo==='continuo' && m.pausadoDesde) tipoLabel = `Pausado desde ${fmtDateShort(m.pausadoDesde)}`;
           else tipoLabel = m.tipo==='continuo' ? 'Contínuo' : `Até ${fmtDateShort(m.dataFim)}`;
-          const horarios = (m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : (m.dose?esc(m.dose):'');
+          const horarios = (m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time||'Sem horário'}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : (m.dose?esc(m.dose):'');
           return `<div class="med-pick-btn" style="display:block; width:100%; text-align:left; padding:9px 12px; opacity:${(m.pausadoDesde||m.encerradoEm)?'.4':'.6'}">
               <div class="mp-name">${esc(m.name)}</div>
               <div class="mp-sub">${tipoLabel}${horarios?' · '+horarios:''}</div>
@@ -2123,7 +2123,7 @@ function openReport(){
     const medRows = meds.slice().sort(sortMedsByName).map(m=>{
       const horarios = m.tipo==='sob-demanda'
         ? (m.dose ? `conforme necessário — ${esc(m.dose)}` : 'conforme necessário')
-        : ((m.horarios&&m.horarios.length)? m.horarios.map(h=> `${h.time}${h.dose?' — '+esc(h.dose):''}`).join('<br/>') : '—');
+        : ((m.horarios&&m.horarios.length)? m.horarios.map(h=> `${h.time||'Sem horário'}${h.dose?' — '+esc(h.dose):''}`).join('<br/>') : '—');
       const duracao = m.tipo==='continuo'?'Contínuo' : m.tipo==='sob-demanda'?'Sob demanda' : `Pontual (${fmtDateShort(m.dataInicio)} a ${fmtDateShort(m.dataFim)})`;
       return `<tr><td>${esc(m.name)}</td><td>${horarios}</td><td>${duracao}</td></tr>`;
     }).join('');
@@ -2405,7 +2405,7 @@ function openMedManager(onDone, jumpToId, startAdding){
 
   function medSubLabel(m){
     if(m.tipo==='sob-demanda') return 'Sob demanda' + (m.dose?' · '+esc(m.dose):'');
-    const horarios = (m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : (m.dose ? esc(m.dose) : '');
+    const horarios = (m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time||'Sem horário'}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : (m.dose ? esc(m.dose) : '');
     if(m.tipo==='continuo' && m.encerradoEm) return `Contínuo · Encerrado em ${fmtDateShort(m.encerradoEm)}`;
     if(m.tipo==='continuo' && m.pausadoDesde) return `Contínuo · Pausado desde ${fmtDateShort(m.pausadoDesde)}${horarios?' · '+horarios:''}`;
     return `${m.tipo==='continuo'?'Contínuo':`Pontual · ${fmtDateShort(m.dataInicio)} a ${fmtDateShort(m.dataFim)}`}${horarios?' · '+horarios:''}`;
@@ -2498,9 +2498,9 @@ function openMedManager(onDone, jumpToId, startAdding){
     const t = document.getElementById('d_horario_new');
     if(!t) return;
     const v = t.value;
-    if(!v) return;
     const doseEl = document.getElementById('d_horario_dose');
     const doseVal = ((doseEl && doseEl.value) || '').trim();
+    if(!v && !doseVal) return;
     if(draft.horarios.some(h=>h.time===v)){
       draft.horarios = draft.horarios.map(h=> h.time===v ? {time:v, dose:doseVal} : h);
     } else {
@@ -2587,7 +2587,7 @@ function openMedManager(onDone, jumpToId, startAdding){
       ${isScheduled? `<div class="field"><label>Horários e posologia</label>
         <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px">
           ${draft.horarios.map((h,i)=>`<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:${CATEGORIES.remedio.hex}18; border-radius:8px; padding:7px 8px 7px 12px">
-            <span style="font-size:.85rem; font-weight:600; color:${CATEGORIES.remedio.hex}">${h.time}${h.dose?' · '+esc(h.dose):''}</span>
+            <span style="font-size:.85rem; font-weight:600; color:${CATEGORIES.remedio.hex}">${h.time||'Sem horário'}${h.dose?' · '+esc(h.dose):''}</span>
             <button type="button" data-rm-horario="${i}" style="background:none; border:none; padding:2px; display:flex; color:${CATEGORIES.remedio.hex}">${icon('x',13,CATEGORIES.remedio.hex)}</button>
           </div>`).join('')}
         </div>
