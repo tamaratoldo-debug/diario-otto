@@ -247,6 +247,8 @@ const ICONS = {
   chevronUp:'<path d="m18 15-6-6-6 6"/>',
   chevronLeft:'<path d="m15 18-6-6 6-6"/>',
   chevronRight:'<path d="m9 18 6-6-6-6"/>',
+  pause:'<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+  play:'<path d="M6 3v18l16-9L6 3Z"/>',
   x:'<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
   trash:'<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/>',
   pencil:'<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497Z"/><path d="m15 5 4 4"/>',
@@ -275,7 +277,17 @@ const fmtDateShort = ds=>{ if(!ds) return '?'; const [y,m,d]=ds.split('-'); retu
 const fmtDateDMY = ds=>{ if(!ds) return ''; const [y,m,d]=ds.split('-'); return `${d}/${m}/${y}`; };
 const isSameDay = (iso, ds)=>{ const d=new Date(iso); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`===ds; };
 const toLocalDateStr = (d)=> `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-const isMedActiveOnDate = (med, t)=>{ if(med.tipo==='sob-demanda') return false; if(med.tipo==='continuo') return true; if(med.dataInicio && t<med.dataInicio) return false; if(med.dataFim && t>med.dataFim) return false; return true; };
+const isMedActiveOnDate = (med, t)=>{
+  if(med.tipo==='sob-demanda') return false;
+  if(med.encerradoEm && t>med.encerradoEm) return false;
+  if(med.tipo==='continuo'){
+    if(med.pausadoDesde && t>=med.pausadoDesde) return false;
+    return true;
+  }
+  if(med.dataInicio && t<med.dataInicio) return false;
+  if(med.dataFim && t>med.dataFim) return false;
+  return true;
+};
 const isMedActiveToday = med=> isMedActiveOnDate(med, todayStr());
 const esc = s => (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
@@ -2370,9 +2382,10 @@ function openMedManager(onDone, jumpToId, startAdding){
   let list = meds.slice();
   let adding = false;
   let editingId = null;
-  let draft = {name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[]};
+  let draft = {name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[], pausadoDesde:'', encerradoEm:''};
   let submitting = false;
   let confirmingDeleteId = null;
+  let confirmingEncerrar = false;
   let isNewDraft = false;
 
   if(jumpToId){
@@ -2381,7 +2394,7 @@ function openMedManager(onDone, jumpToId, startAdding){
       editingId = m.id;
       adding = true;
       isNewDraft = false;
-      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).map(h=>({...h})) };
+      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).map(h=>({...h})), pausadoDesde:m.pausadoDesde||'', encerradoEm:m.encerradoEm||'' };
     }
   } else if(startAdding){
     adding = true;
@@ -2390,6 +2403,8 @@ function openMedManager(onDone, jumpToId, startAdding){
   function medSubLabel(m){
     if(m.tipo==='sob-demanda') return 'Sob demanda' + (m.dose?' · '+esc(m.dose):'');
     const horarios = (m.horarios&&m.horarios.length) ? m.horarios.map(h=> `${h.time}${h.dose?' ('+esc(h.dose)+')':''}`).join(', ') : (m.dose ? esc(m.dose) : '');
+    if(m.tipo==='continuo' && m.encerradoEm) return `Contínuo · Encerrado em ${fmtDateShort(m.encerradoEm)}`;
+    if(m.tipo==='continuo' && m.pausadoDesde) return `Contínuo · Pausado desde ${fmtDateShort(m.pausadoDesde)}${horarios?' · '+horarios:''}`;
     return `${m.tipo==='continuo'?'Contínuo':`Pontual · ${fmtDateShort(m.dataInicio)} a ${fmtDateShort(m.dataFim)}`}${horarios?' · '+horarios:''}`;
   }
 
@@ -2397,7 +2412,7 @@ function openMedManager(onDone, jumpToId, startAdding){
     submitting = false;
     const scheduled = list.filter(m=> m.tipo!=='sob-demanda').sort(sortMedsByName);
     const onDemand = list.filter(m=> m.tipo==='sob-demanda').sort(sortMedsByName);
-    const itemHtml = m=> `<div class="manager-item" data-open="${m.id}" style="cursor:pointer"><div><div class="name">${esc(m.name)}</div><div class="sub">${medSubLabel(m)}</div></div><button class="del-btn" data-id="${m.id}">${icon('trash',14,'var(--ink-muted)')}</button></div>`;
+    const itemHtml = m=> `<div class="manager-item" data-open="${m.id}" style="cursor:pointer; ${(m.pausadoDesde||m.encerradoEm)?'opacity:.55':''}"><div><div class="name">${esc(m.name)}</div><div class="sub">${medSubLabel(m)}</div></div><button class="del-btn" data-id="${m.id}">${icon('trash',14,'var(--ink-muted)')}</button></div>`;
     host.innerHTML = `<div class="overlay" id="ovMed">
       <div class="sheet" style="max-height:90vh">
         <div class="sheet-head"><div class="sheet-title">Remédios atuais</div></div>
@@ -2422,7 +2437,8 @@ function openMedManager(onDone, jumpToId, startAdding){
       adding = true;
       isNewDraft = false;
       confirmingDeleteId = m.id;
-      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).map(h=>({...h})) };
+      confirmingEncerrar = false;
+      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).map(h=>({...h})), pausadoDesde:m.pausadoDesde||'', encerradoEm:m.encerradoEm||'' };
       syncMedListVisibility();
       renderAddArea();
       document.getElementById('addArea').scrollIntoView({behavior:'smooth', block:'center'});
@@ -2434,7 +2450,8 @@ function openMedManager(onDone, jumpToId, startAdding){
       adding = true;
       isNewDraft = false;
       confirmingDeleteId = null;
-      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).map(h=>({...h})) };
+      confirmingEncerrar = false;
+      draft = { name:m.name, tipo:m.tipo, dataInicio:m.dataInicio||todayStr(), dataFim:m.dataFim||'', dose:m.dose||'', horarios:(m.horarios||[]).map(h=>({...h})), pausadoDesde:m.pausadoDesde||'', encerradoEm:m.encerradoEm||'' };
       syncMedListVisibility();
       renderAddArea();
       document.getElementById('addArea').scrollIntoView({behavior:'smooth', block:'center'});
@@ -2489,7 +2506,9 @@ function openMedManager(onDone, jumpToId, startAdding){
       dataInicio: draft.tipo==='pontual'?draft.dataInicio:'',
       dataFim: draft.tipo==='pontual'?draft.dataFim:'',
       dose: draft.tipo==='sob-demanda' ? draft.dose.trim() : '',
-      horarios: (draft.tipo==='continuo'||draft.tipo==='pontual') ? draft.horarios.map(h=>({...h})) : []
+      horarios: (draft.tipo==='continuo'||draft.tipo==='pontual') ? draft.horarios.map(h=>({...h})) : [],
+      pausadoDesde: draft.tipo==='continuo' ? (draft.pausadoDesde||'') : '',
+      encerradoEm: draft.encerradoEm||''
     };
     list = list.map(m=> m.id===editingId ? { ...m, ...payload } : m);
   }
@@ -2499,8 +2518,8 @@ function openMedManager(onDone, jumpToId, startAdding){
     if(!adding){
       area.innerHTML = `<button type="button" class="link-btn" id="startAdd" style="color:${CATEGORIES.remedio.hex}; margin-bottom:14px">+ Cadastrar remédio</button>`;
       document.getElementById('startAdd').addEventListener('click', ()=>{
-        adding=true; editingId=null; confirmingDeleteId=null;
-        draft={name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[]};
+        adding=true; editingId=null; confirmingDeleteId=null; confirmingEncerrar=false;
+        draft={name:'', tipo:'continuo', dataInicio:todayStr(), dataFim:'', dose:'', horarios:[], pausadoDesde:'', encerradoEm:''};
         syncMedListVisibility(); renderAddArea();
       });
       return;
@@ -2517,6 +2536,10 @@ function openMedManager(onDone, jumpToId, startAdding){
         <button data-tipo="pontual" class="${draft.tipo==='pontual'?'sel':''}">Pontual (início e fim)</button>
         <button data-tipo="sob-demanda" class="${draft.tipo==='sob-demanda'?'sel':''}">Sob demanda</button>
       </div></div>
+      ${(editingId && !isNewDraft && draft.tipo==='continuo' && !draft.encerradoEm) ? `
+        <button type="button" id="togglePauseBtn" class="btn-secondary" style="width:100%; display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:14px">${draft.pausadoDesde? icon('play',14)+' Retomar' : icon('pause',14)+' Pausar'}</button>
+      ` : ''}
+      ${draft.encerradoEm? `<div class="hint" style="margin:-6px 0 14px">Encerrado em ${fmtDateShort(draft.encerradoEm)}.</div>` : ''}
       ${draft.tipo==='pontual'? `
         <div class="field"><label>Início</label>${dtField('d_inicio','date',draft.dataInicio)}</div>
         <div class="field"><label>Fim</label>${dtField('d_fim','date',draft.dataFim)}</div>
@@ -2535,6 +2558,16 @@ function openMedManager(onDone, jumpToId, startAdding){
         </div>
       </div>` : ''}
       ${nameConflict()? `<div class="hint" style="color:#B3261E; margin-top:-6px">Já existe um remédio chamado "${esc(draft.name.trim())}".</div>` : ''}
+      ${(editingId && !isNewDraft && draft.tipo==='continuo' && !draft.encerradoEm) ? `<button type="button" class="link-btn" id="encerrarMedBtn" style="color:var(--ink-muted); margin-top:6px">Encerrar este remédio</button>` : ''}
+      ${confirmingEncerrar? `
+        <div style="background:#F1EEE6; border-radius:10px; padding:10px 12px; margin-top:10px; display:flex; flex-direction:column; gap:8px">
+          <span style="font-size:.82rem; color:var(--ink)">Isso encerra "${esc(draft.name)}" hoje. Pra retomar depois, você cadastra ele de novo. Confirmar?</span>
+          <div style="display:flex; gap:6px; justify-content:flex-end">
+            <button type="button" id="cancelEncerrarBtn" style="background:none; border:none; padding:5px 8px; font-family:inherit; font-size:.78rem; color:var(--ink-muted); cursor:pointer">Cancelar</button>
+            <button type="button" id="confirmEncerrarBtn" style="background:var(--ink); color:#fff; border:none; border-radius:7px; padding:5px 10px; font-family:inherit; font-size:.78rem; font-weight:600; cursor:pointer">Encerrar</button>
+          </div>
+        </div>
+      ` : ''}
       ${editingId && confirmingDeleteId===editingId? `
         <div style="background:#FBEAE9; border-radius:10px; padding:10px 12px; margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:8px">
           <span style="font-size:.82rem; color:#B3261E">Excluir "${esc(draft.name)}"?</span>
@@ -2545,10 +2578,10 @@ function openMedManager(onDone, jumpToId, startAdding){
         </div>
       ` : ''}
     </div>`;
-    document.getElementById('backToList').addEventListener('click', ()=>{ flushPendingHorario(); syncDraftToList(); adding=false; confirmingDeleteId=null; syncMedListVisibility(); render(); });
+    document.getElementById('backToList').addEventListener('click', ()=>{ flushPendingHorario(); syncDraftToList(); adding=false; confirmingDeleteId=null; confirmingEncerrar=false; syncMedListVisibility(); render(); });
     document.getElementById('d_name').addEventListener('input', e=>{ draft.name=e.target.value; syncDraftToList(); refreshInlineOnly(); });
     const deleteBtn = document.getElementById('deleteMedBtn');
-    if(deleteBtn) deleteBtn.addEventListener('click', ()=>{ confirmingDeleteId = editingId; renderAddArea(); });
+    if(deleteBtn) deleteBtn.addEventListener('click', ()=>{ confirmingDeleteId = editingId; confirmingEncerrar=false; renderAddArea(); });
     const cancelDeleteBtn = document.getElementById('cancelDeleteMedBtn');
     if(cancelDeleteBtn) cancelDeleteBtn.addEventListener('click', ()=>{ confirmingDeleteId = null; renderAddArea(); });
     const confirmDeleteBtn = document.getElementById('confirmDeleteMedBtn');
@@ -2558,6 +2591,24 @@ function openMedManager(onDone, jumpToId, startAdding){
       render();
     });
     document.querySelectorAll('[data-tipo]').forEach(b=> b.addEventListener('click', ()=>{ draft.tipo=b.dataset.tipo; syncDraftToList(); renderAddArea(); }));
+    const togglePauseBtn = document.getElementById('togglePauseBtn');
+    if(togglePauseBtn) togglePauseBtn.addEventListener('click', ()=>{
+      draft.pausadoDesde = draft.pausadoDesde ? '' : todayStr();
+      syncDraftToList();
+      renderAddArea();
+    });
+    const encerrarBtn = document.getElementById('encerrarMedBtn');
+    if(encerrarBtn) encerrarBtn.addEventListener('click', ()=>{ confirmingEncerrar = true; confirmingDeleteId=null; renderAddArea(); });
+    const cancelEncerrarBtn = document.getElementById('cancelEncerrarBtn');
+    if(cancelEncerrarBtn) cancelEncerrarBtn.addEventListener('click', ()=>{ confirmingEncerrar = false; renderAddArea(); });
+    const confirmEncerrarBtn = document.getElementById('confirmEncerrarBtn');
+    if(confirmEncerrarBtn) confirmEncerrarBtn.addEventListener('click', ()=>{
+      draft.encerradoEm = todayStr();
+      draft.pausadoDesde = '';
+      confirmingEncerrar = false;
+      syncDraftToList();
+      renderAddArea();
+    });
     wireDtField('d_inicio', v=>{ draft.dataInicio=v; syncDraftToList(); });
     wireDtField('d_fim', v=>{ draft.dataFim=v; syncDraftToList(); });
     const doseInput = document.getElementById('d_dose');
