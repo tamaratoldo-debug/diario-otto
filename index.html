@@ -711,7 +711,7 @@ function pastMedGroupHtml(dayKey, dateStr, remedioEntries, searchQuery){
   const slotRowsHtml = slotRows.map(r=>{
     const m = r.med;
     const given = !!r.entry;
-    const noteText = given ? (r.entry.note||'') : '';
+    const noteText = (given && r.entry.note && r.entry.note!==r.dose) ? r.entry.note : '';
     const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${r.horario?' · '+r.horario:''}${r.dose?' · '+esc(r.dose):''}${noteText?' · '+esc(noteText):''}`;
     const inner = `<button data-med-edit="${m.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
