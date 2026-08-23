@@ -840,6 +840,21 @@ function entrySubtitle(e){
   }
   if(e.category==='consulta' && e.clinica) return e.clinica + (e.note? ' · '+e.note : '');
   if(e.category==='peso') return `${e.value} kg` + (e.note? ' · '+e.note : '');
+  if(e.category==='remedio'){
+    if(e.note) return e.note;
+    // Lançamentos antigos podem ter sido salvos sem dose (bug já corrigido).
+    // Completa com a dose cadastrada hoje no remédio, pra bater com o que a
+    // visão por dia já mostra.
+    if(e.medId){
+      const m = meds.find(x=>x.id===e.medId);
+      if(m){
+        const h = (m.horarios||[]).find(h=> (h.time||'')===(e.horarioSlot||''));
+        if(h && h.dose) return h.dose;
+        if(m.dose) return m.dose;
+      }
+    }
+    return '';
+  }
   return e.note || '';
 }
 
