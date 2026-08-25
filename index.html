@@ -135,6 +135,7 @@
   .dt-wrap{position:relative}
   .dt-display{width:100%; padding:10px 12px; border-radius:10px; border:1px solid #E5E0D4; font-size:16px; color:var(--ink); background:#FBFAF7; box-sizing:border-box; min-height:22px; display:flex; align-items:center; gap:8px; pointer-events:none}
   .dt-native{position:absolute; inset:0; width:100%; height:100%; opacity:0; font-size:16px; border:none; margin:0; padding:0}
+  .dt-clear{position:absolute; right:4px; top:0; bottom:0; width:28px; border:none; background:none; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer}
   .field textarea{min-height:70px; resize:vertical}
   .row2{display:flex; gap:8px}
   .row2 > *{min-width:0}
@@ -301,10 +302,24 @@ function dtField(id, type, value, placeholder){
   const display = type==='time'
     ? (value || `<span style="color:#B3AFA3">${placeholder||'Selecionar'}</span>`)
     : (value ? fmtDateDMY(value) : `<span style="color:#B3AFA3">${placeholder||'Selecionar'}</span>`);
+  const clearBtn = type==='time' ? `<button type="button" id="${id}_clear" class="dt-clear" style="${value?'':'display:none'}">${icon('x',13,'#8A8F9C')}</button>` : '';
+  const nativeStyle = type==='time' ? 'left:0; right:32px' : 'inset:0';
   return `<div class="dt-wrap">
     <div class="dt-display" id="${id}_display">${icon(iconName,15,'#8A8F9C')}<span>${display}</span></div>
-    <input type="${type}" id="${id}" class="dt-native" value="${value||''}"/>
+    <input type="${type}" id="${id}" class="dt-native" style="${nativeStyle}" value="${value||''}"/>
+    ${clearBtn}
   </div>`;
+}
+function updateDtDisplay(id, v){
+  const disp = document.getElementById(id+'_display');
+  if(!disp) return;
+  const input = document.getElementById(id);
+  const type = input ? input.type : 'time';
+  const text = type==='time' ? (v||'Selecionar') : (v? fmtDateDMY(v) : 'Selecionar');
+  const span = disp.querySelector('span');
+  if(span) span.textContent = text;
+  const clearBtn = document.getElementById(id+'_clear');
+  if(clearBtn) clearBtn.style.display = v ? '' : 'none';
 }
 function wireDtField(id, onChange){
   const input = document.getElementById(id);
@@ -312,14 +327,17 @@ function wireDtField(id, onChange){
   input.addEventListener('change', e=>{
     const v = e.target.value;
     if(onChange) onChange(v);
-    const disp = document.getElementById(id+'_display');
-    if(disp){
-      const type = input.type;
-      const text = type==='time' ? (v||'Selecionar') : (v? fmtDateDMY(v) : 'Selecionar');
-      const span = disp.querySelector('span');
-      if(span) span.textContent = text;
-    }
+    updateDtDisplay(id, v);
   });
+  const clearBtn = document.getElementById(id+'_clear');
+  if(clearBtn){
+    clearBtn.addEventListener('click', (ev)=>{
+      ev.preventDefault(); ev.stopPropagation();
+      input.value = '';
+      if(onChange) onChange('');
+      updateDtDisplay(id, '');
+    });
+  }
 }
 
 // Photos live in IndexedDB, not localStorage: the quota is far larger (typically
@@ -1215,8 +1233,7 @@ function pesoChartHtml(){
 
 function emptyForm(cat){
   const now = new Date();
-  const timeDefault = cat==='procedimento' ? '' : `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-  return { title:'', quantidade:'', dateD: todayStr(), dateT: timeDefault, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:'', quemFez:'', cobrarViaCreche:false, photo:'', photoBlob:null, photoId:'', removedPhoto:false, anexoUrl:'', anexoBlob:null, anexoId:'', anexoName:'', anexoType:'', removedAnexo:false };
+  return { title:'', quantidade:'', dateD: todayStr(), dateT: `${pad(now.getHours())}:${pad(now.getMinutes())}`, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:'', quemFez:'', cobrarViaCreche:false, photo:'', photoBlob:null, photoId:'', removedPhoto:false, anexoUrl:'', anexoBlob:null, anexoId:'', anexoName:'', anexoType:'', removedAnexo:false };
 }
 
 function openEntryModal(category, editId){
