@@ -888,7 +888,7 @@ function entryRowHtml(e){
   return `<button class="entry-row" data-id="${e.id}">
     <div class="entry-top">
       <div class="entry-title"><span style="color:${cat.hex}; display:flex">${icon(cat.icon,13,cat.hex)}</span><span style="flex:1; min-width:0">${esc(e.title)}</span>${badge}</div>
-      ${e.category!=='creche' ? `<span class="entry-time">${fmtTime(e.date)}</span>` : ''}
+      ${(e.category!=='creche' && !e.noTime) ? `<span class="entry-time">${fmtTime(e.date)}</span>` : ''}
     </div>
     ${sub?`<div class="entry-sub">${esc(sub)}</div>`:''}
   </button>`;
@@ -1245,7 +1245,7 @@ function openEntryModal(category, editId){
   }
   let form = editing ? {
     title: editing.title||'', quantidade: editing.quantidade||'',
-    dateD: toLocalDateStr(new Date(editing.date)), dateT: fmtTime(editing.date),
+    dateD: toLocalDateStr(new Date(editing.date)), dateT: editing.noTime ? '' : fmtTime(editing.date),
     note: editing.note||'', value: editing.value ?? '', gravidade: editing.gravidade||'',
     comoComeu: editing.comoComeu||'', clinica: editing.clinica||'', tipoExame: editing.tipoExame||'',
     quemFez: editing.quemFez||'', cobrarViaCreche: !!editing.cobrarViaCreche,
@@ -1629,7 +1629,7 @@ function openEntryModal(category, editId){
 
   async function save(){
     const dateIso = new Date(`${form.dateD}T${form.dateT||'12:00'}`).toISOString();
-    let entry = { id: editing? editing.id : genId(), category, date: dateIso, note: form.note.trim(), createdAt: editing? editing.createdAt : Date.now() };
+    let entry = { id: editing? editing.id : genId(), category, date: dateIso, note: form.note.trim(), createdAt: editing? editing.createdAt : Date.now(), noTime: !form.dateT };
     if(category==='peso'){ entry.value = parseFloat(form.value); entry.title='Peso'; }
     else if(category==='exame'){ entry.title=form.tipoExame; entry.tipoExame=form.tipoExame; entry.quemFez=form.quemFez.trim(); entry.cobrarViaCreche=!!form.cobrarViaCreche; if(editing && editing.crecheLancId) entry.crecheLancId = editing.crecheLancId; }
     else if(category==='intercorrencia'){
@@ -2179,14 +2179,14 @@ function openReport(){
         else naoAdmin.push(s.horario ? `${s.med.name} (${s.horario})` : s.med.name);
       });
       const alimentacao = dayEntries.filter(e=>e.category==='alimentacao')
-        .map(e=> `${fmtTime(e.date)} — ${esc(e.title)}${entrySubtitle(e)?` (${esc(entrySubtitle(e))})`:''}`).join('<br/>');
+        .map(e=> `${e.noTime?'Sem horário':fmtTime(e.date)} — ${esc(e.title)}${entrySubtitle(e)?` (${esc(entrySubtitle(e))})`:''}`).join('<br/>');
       const interc = dayEntries.filter(e=>e.category==='intercorrencia')
-        .map(e=> `${fmtTime(e.date)} — ${esc(e.title)}${e.gravidade?` (${e.gravidade})`:''}${e.note?`: "${esc(e.note)}"`:''}`).join('<br/>');
+        .map(e=> `${e.noTime?'Sem horário':fmtTime(e.date)} — ${esc(e.title)}${e.gravidade?` (${e.gravidade})`:''}${e.note?`: "${esc(e.note)}"`:''}`).join('<br/>');
       const proc = dayEntries.filter(e=> ['procedimento','consulta','exame'].includes(e.category))
         .map(e=>{
           const catLabel = {procedimento:'Procedimento',consulta:'Consulta',exame:'Exame'}[e.category];
           let extra = e.clinica || (e.category==='exame'?e.tipoExame:'') || '';
-          return `${fmtTime(e.date)} — ${catLabel}: ${esc(e.title)}${extra?` (${esc(extra)})`:''}${e.note?` — ${esc(e.note)}`:''}`;
+          return `${e.noTime?'Sem horário':fmtTime(e.date)} — ${catLabel}: ${esc(e.title)}${extra?` (${esc(extra)})`:''}${e.note?` — ${esc(e.note)}`:''}`;
         }).join('<br/>');
 
       let rows = `<div class="rep-day-row"><div class="rep-day-label">Remédios</div><div class="rep-day-val">${remedios.length?esc(remedios.join(', ')):'—'}</div></div>`;
