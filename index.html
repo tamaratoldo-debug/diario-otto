@@ -1012,7 +1012,7 @@ function renderTimeline(){
       cardsHtml += `<div class="day-card" data-daycard="${esc(day.key)}" style="${isExpanded?'':'display:none'}"><div class="day-num"><div class="n">${dayNum}</div></div><div class="day-sep"></div><div class="entries-col">`;
       cardsHtml += pendingHtml;
       const sortedItems = day.items.slice().sort((a,b)=>{
-        const rank = e=> e.category==='creche' ? 0 : (e.noTime ? 1 : 2);
+        const rank = e=> e.category==='creche' ? 0 : (e.noTime ? 2 : 1);
         const ra = rank(a), rb = rank(b);
         if(ra!==rb) return ra-rb;
         return new Date(a.date) - new Date(b.date);
