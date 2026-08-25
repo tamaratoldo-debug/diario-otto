@@ -1012,8 +1012,10 @@ function renderTimeline(){
       cardsHtml += `<div class="day-card" data-daycard="${esc(day.key)}" style="${isExpanded?'':'display:none'}"><div class="day-num"><div class="n">${dayNum}</div></div><div class="day-sep"></div><div class="entries-col">`;
       cardsHtml += pendingHtml;
       const sortedItems = day.items.slice().sort((a,b)=>{
-        if(a.category==='creche' && b.category!=='creche') return -1;
-        if(b.category==='creche' && a.category!=='creche') return 1;
+        const aTop = a.category==='creche' || a.noTime;
+        const bTop = b.category==='creche' || b.noTime;
+        if(aTop && !bTop) return -1;
+        if(bTop && !aTop) return 1;
         return new Date(a.date) - new Date(b.date);
       });
       cardsHtml += sortedItems.map(entryRowHtml).join('');
