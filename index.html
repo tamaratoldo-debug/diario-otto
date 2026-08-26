@@ -1261,6 +1261,7 @@ function openEntryModal(category, editId){
   let medConcludedExpanded = false;
   let medQuickTimePick = null;
   let medQuickTimeVal = '';
+  let medQuickDateVal = '';
 
   function canSave(){
     if(category==='peso') return form.value!=='' && !isNaN(parseFloat(form.value));
@@ -1287,9 +1288,12 @@ function openEntryModal(category, editId){
         const cardHtml = m=>{
           if(medQuickTimePick===m.id){
             return `<div class="med-pick-btn" style="padding:9px 10px; width:100%">
-              <div class="mp-name" style="margin-bottom:8px">${esc(m.name)} — que horas?</div>
+              <div class="mp-name" style="margin-bottom:8px">${esc(m.name)} — quando?</div>
+              <div style="display:flex; gap:8px; margin-bottom:8px">
+                <div style="flex:1">${dtField('quickDateInput','date',medQuickDateVal)}</div>
+                <div style="flex:1">${dtField('quickTimeInput','time',medQuickTimeVal)}</div>
+              </div>
               <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
-                <div style="flex:1; min-width:120px">${dtField('quickTimeInput','time',medQuickTimeVal)}</div>
                 <button type="button" class="pick-btn" data-quicklogtime="${m.id}" style="background:${cat.hex}; color:#fff">Registrar</button>
                 <button type="button" class="pick-btn" data-quickcancel="1">Cancelar</button>
               </div>
@@ -1459,14 +1463,16 @@ function openEntryModal(category, editId){
         medQuickTimePick = m.id;
         const now = new Date();
         medQuickTimeVal = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        medQuickDateVal = todayStr();
         refreshBody();
       }));
       document.querySelectorAll('[data-quicklogtime]').forEach(b=> b.addEventListener('click', ()=>{
         const medId = b.dataset.quicklogtime;
-        toggleMedOnDate(medId, '', todayStr(), medQuickTimeVal);
+        toggleMedOnDate(medId, '', medQuickDateVal||todayStr(), medQuickTimeVal);
         medQuickTimePick = null;
         closeModal();
       }));
+      wireDtField('quickDateInput', v=>{ if(v) medQuickDateVal = v; });
       wireDtField('quickTimeInput', v=>{ if(v) medQuickTimeVal = v; });
       document.querySelectorAll('[data-quickcancel]').forEach(b=> b.addEventListener('click', ()=>{ medQuickHorarioPick=null; medQuickTimePick=null; refreshBody(); }));
       const toggleConcludedBtn1 = document.getElementById('toggleConcluded');
@@ -1586,14 +1592,16 @@ function openEntryModal(category, editId){
         medQuickTimePick = m.id;
         const now = new Date();
         medQuickTimeVal = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        medQuickDateVal = todayStr();
         refreshBody();
       }));
       document.querySelectorAll('[data-quicklogtime]').forEach(b=> b.addEventListener('click', ()=>{
         const medId = b.dataset.quicklogtime;
-        toggleMedOnDate(medId, '', todayStr(), medQuickTimeVal);
+        toggleMedOnDate(medId, '', medQuickDateVal||todayStr(), medQuickTimeVal);
         medQuickTimePick = null;
         closeModal();
       }));
+      wireDtField('quickDateInput', v=>{ if(v) medQuickDateVal = v; });
       wireDtField('quickTimeInput', v=>{ if(v) medQuickTimeVal = v; });
       document.querySelectorAll('[data-quickcancel]').forEach(b=> b.addEventListener('click', ()=>{ medQuickHorarioPick=null; medQuickTimePick=null; refreshBody(); }));
       const toggleConcludedBtn2 = document.getElementById('toggleConcluded');
