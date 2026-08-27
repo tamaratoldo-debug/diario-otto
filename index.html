@@ -730,8 +730,10 @@ function pastMedGroupHtml(dayKey, dateStr, remedioEntries, searchQuery){
   const slotRowsHtml = slotRows.map(r=>{
     const m = r.med;
     const given = !!r.entry;
-    const noteText = (given && r.entry.note && r.entry.note!==r.dose) ? r.entry.note : '';
-    const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${r.horario?' · '+r.horario:''}${r.dose?' · '+esc(r.dose):''}${noteText?' · '+esc(noteText):''}`;
+    // A dose administrada (editável por dia) substitui a dose padrão na
+    // exibição, em vez de aparecer junto — evita mostrar "1/2 comp · 1 comp".
+    const doseDisplay = given ? (r.entry.note || r.dose || '') : (r.dose || '');
+    const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${r.horario?' · '+r.horario:''}${doseDisplay?' · '+esc(doseDisplay):''}`;
     const inner = `<button data-med-edit="${m.id}" data-horario="${esc(r.horario)}" data-med-date="${esc(dateStr)}" data-entry-id="${r.entry?r.entry.id:''}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
         <div class="entry-sub">${sub}</div>
