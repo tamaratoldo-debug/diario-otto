@@ -856,10 +856,9 @@ function openMedDoseEdit(medId, horario, dateStr, entryId){
           <button class="icon-btn" id="closeMedDose">${icon('x',18)}</button>
         </div>
         <div class="sheet-body">
-          <div class="hint" style="margin-bottom:14px">${fmtDateShort(dateStr)}</div>
+          <div class="hint" style="margin-bottom:14px">Editando só a dose deste dia · ${fmtDateShort(dateStr)}</div>
           <div class="field"><label>Horário administrado</label>${dtField('mdeTime','time',timeVal)}</div>
           <div class="field"><label>Dose administrada</label><input id="mdeDose" autocomplete="off" value="${esc(doseVal)}" placeholder="dose (opcional)"/></div>
-          <button type="button" class="link-btn" id="mdeManage" style="color:var(--ink-muted)">Editar remédio (nome, horários, tipo)</button>
         </div>
         <div class="sheet-foot">
           <button class="btn-secondary" id="mdeCancel">Cancelar</button>
@@ -876,7 +875,6 @@ function openMedDoseEdit(medId, horario, dateStr, entryId){
     document.getElementById('mdeCancel').addEventListener('click', closeModal);
     wireDtField('mdeTime', v=>{ timeVal=v; });
     document.getElementById('mdeDose').addEventListener('input', e=>{ doseVal=e.target.value; });
-    document.getElementById('mdeManage').addEventListener('click', ()=>{ closeModal(); openMedManager(()=>renderAll(), medId); });
     document.getElementById('mdeSave').addEventListener('click', save);
   }
 
