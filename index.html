@@ -283,6 +283,7 @@ const isMedActiveOnDate = (med, t)=>{
   if(med.tipo==='sob-demanda') return false;
   if(med.encerradoEm && t>med.encerradoEm) return false;
   if(med.tipo==='continuo'){
+    if(med.dataInicio && t<med.dataInicio) return false;
     if(med.pausadoDesde && t>=med.pausadoDesde) return false;
     return true;
   }
@@ -2577,7 +2578,7 @@ function openMedManager(onDone, jumpToId, startAdding){
     }
     const payload = {
       name:n, tipo:draft.tipo,
-      dataInicio: draft.tipo==='pontual'?draft.dataInicio:'',
+      dataInicio: (draft.tipo==='pontual'||draft.tipo==='continuo') ? draft.dataInicio : '',
       dataFim: draft.tipo==='pontual'?draft.dataFim:'',
       dose: draft.tipo==='sob-demanda' ? draft.dose.trim() : '',
       horarios: (draft.tipo==='continuo'||draft.tipo==='pontual') ? draft.horarios.map(h=>({...h})) : [],
@@ -2626,6 +2627,9 @@ function openMedManager(onDone, jumpToId, startAdding){
         ` : ''}
       ` : ''}
       ${draft.encerradoEm? `<div class="hint" style="margin:-6px 0 14px">Encerrado em ${fmtDateShort(draft.encerradoEm)}.</div>` : ''}
+      ${draft.tipo==='continuo'? `
+        <div class="field"><label>Início</label>${dtField('d_inicio','date',draft.dataInicio)}</div>
+      ` : ''}
       ${draft.tipo==='pontual'? `
         <div class="field"><label>Início</label>${dtField('d_inicio','date',draft.dataInicio)}</div>
         <div class="field"><label>Fim</label>${dtField('d_fim','date',draft.dataFim)}</div>
