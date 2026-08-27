@@ -90,7 +90,8 @@
   .month-label{font-size:.9rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--ink); margin:22px 4px 10px}
   .day-squares-row{display:flex; gap:8px; overflow-x:auto; padding:2px 4px 10px; scrollbar-width:none}
   .day-squares-row::-webkit-scrollbar{display:none}
-  .day-square{flex-shrink:0; width:46px; display:flex; flex-direction:column; align-items:center; gap:3px; background:#fff; border:1px solid #EFEBE1; border-radius:12px; padding:8px 4px 7px; font-family:inherit; cursor:pointer}
+  .day-square{flex-shrink:0; width:46px; display:flex; flex-direction:column; align-items:center; gap:3px; background:#fff; border:1px solid #EFEBE1; border-radius:12px; padding:8px 4px 7px; font-family:inherit; cursor:pointer; position:relative}
+  .day-square .ds-dot{position:absolute; top:5px; right:5px; width:6px; height:6px; border-radius:50%; background:var(--c-intercorrencia)}
   .day-square.active{background:var(--ink); border-color:var(--ink)}
   .day-square .ds-n{font-weight:700; font-size:1.05rem; line-height:1; color:var(--ink)}
   .day-square.active .ds-n{color:#fff}
@@ -266,6 +267,10 @@ function icon(name, size=16, stroke='currentColor'){
 }
 
 // ---------- helpers ----------
+// Atualizado a cada publicação, pra dar pra conferir se o app já pegou a
+// versão nova sem depender de "testa e reza" com cache do Safari.
+const APP_VERSION = '27/08/2026 10:11';
+
 const genId = ()=> Date.now()+'-'+Math.random().toString(36).slice(2,8);
 const pad = n=> String(n).padStart(2,'0');
 const todayStr = ()=>{ const d=new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
@@ -1064,8 +1069,10 @@ function renderTimeline(){
       const dayNum = fmtDay(refDate);
       const weekday = fmtWeekdayShort(refDate);
       const isExpanded = (isSearching || filter!=='todos') ? true : expandedDays.has(day.key);
+      const hasIntercorrencia = entries.some(e=> e.category==='intercorrencia' && new Date(e.date).toDateString()===day.key);
 
       squaresHtml += `<button class="day-square${isExpanded?' active':''}" data-daysquare="${esc(day.key)}">
+        ${hasIntercorrencia?'<span class="ds-dot"></span>':''}
         <div class="ds-n">${dayNum}</div>
         <div class="ds-w">${weekday}</div>
       </button>`;
@@ -2371,6 +2378,7 @@ function openSettings(){
             <button type="button" id="importBtn" class="btn-secondary" style="flex:1; font-size:.82rem; padding:11px 8px">Restaurar backup</button>
             <input type="file" id="importFileInput" accept="application/json" style="display:none"/>
           </div>
+          <div class="hint" style="text-align:center; margin-top:14px">Versão: ${APP_VERSION}</div>
         </div>
         <div class="sheet-foot"><button class="btn-primary" id="saveSet" ${saving?'disabled':''}>${saving?'Salvando...':'Salvar'}</button></div>
       </div>
