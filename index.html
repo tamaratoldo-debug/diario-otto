@@ -2337,7 +2337,6 @@ function openSettings(){
           <div class="field"><label>Link da planilha de exames (opcional, Google Sheets)</label><input id="linkInput" value="${esc(draftSheetLink)}" placeholder="https://..."/></div>
           <div class="field"><label>Link do app da creche (opcional)</label><input id="crecheLinkInput" value="${esc(draftCrecheLink)}" placeholder="https://..."/></div>
           <div style="display:flex; gap:10px; padding-top:14px; margin-top:6px; border-top:1px solid #F1EEE6">
-            <button type="button" id="manageMedsBtn" class="btn-secondary" style="flex:1; font-size:.82rem; padding:11px 8px">Gerenciar remédios</button>
             <button type="button" id="reportBtn" class="btn-secondary" style="flex:1; font-size:.82rem; padding:11px 8px">Gerar relatório</button>
           </div>
           <div style="display:flex; gap:10px; padding-top:10px">
@@ -2354,7 +2353,6 @@ function openSettings(){
     const linkEl = document.getElementById('linkInput'); linkEl.addEventListener('input', e=> draftSheetLink=e.target.value);
     const crecheLinkEl = document.getElementById('crecheLinkInput'); crecheLinkEl.addEventListener('input', e=> draftCrecheLink=e.target.value);
     const importFileEl = document.getElementById('importFileInput');
-    document.getElementById('manageMedsBtn').addEventListener('click', ()=> openMedManager(()=> openSettings()));
     document.getElementById('reportBtn').addEventListener('click', ()=> openReport());
     document.getElementById('importBtn').addEventListener('click', ()=> importFileEl.click());
     importFileEl.addEventListener('change', async (e)=>{
