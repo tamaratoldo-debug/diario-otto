@@ -2426,7 +2426,7 @@ function openFoodManager(onDone){
   function render(){
     host.innerHTML = `<div class="overlay" id="ovFood">
       <div class="sheet">
-        <div class="sheet-head"><div class="sheet-title">Meus alimentos</div><button class="icon-btn" id="closeFood">${icon('x',18)}</button></div>
+        <div class="sheet-head"><div class="sheet-title">Meus alimentos</div><div style="display:flex; gap:6px">${editingId?`<button class="icon-btn danger" id="delFoodBtn">${icon('trash',17,'#A8473A')}</button>`:''}<button class="icon-btn" id="closeFood">${icon('x',18)}</button></div></div>
         <div class="sheet-body">
           ${editingId? `<div class="hint" style="margin-bottom:8px; font-weight:600; color:${CATEGORIES.alimentacao.hex}">Editando</div>` : ''}
           <div class="field"><label>Nome curto</label><input id="foodNameInput" value="${esc(draftName)}" placeholder="ex: Ração seca, Frango com arroz..." style="width:100%; padding:10px 12px; border-radius:10px; border:1px solid #E5E0D4; font-size:16px; background:#FBFAF7; font-family:inherit; box-sizing:border-box"/></div>
@@ -2452,11 +2452,10 @@ function openFoodManager(onDone){
     document.getElementById('foodRecipeInput').addEventListener('input', e=> draftReceita=e.target.value);
     document.getElementById('foodNameInput').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); saveFood(); } });
     const cancelBtn = document.getElementById('cancelFoodBtn'); if(cancelBtn) cancelBtn.addEventListener('click', ()=>{ editingId=null; draftName=''; draftReceita=''; render(); });
+    const delBtn = document.getElementById('delFoodBtn'); if(delBtn) delBtn.addEventListener('click', ()=> askDeleteFood(editingId));
     document.querySelectorAll('#foodList .del-btn').forEach(b=> b.addEventListener('click', (ev)=>{
       ev.stopPropagation();
-      list = list.filter(f=>f.id!==b.dataset.id);
-      if(editingId===b.dataset.id){ editingId=null; draftName=''; draftReceita=''; }
-      render();
+      askDeleteFood(b.dataset.id);
     }));
     document.querySelectorAll('#foodList .manager-item').forEach((row, idx)=> row.addEventListener('click', ()=>{
       const f = list[idx];
@@ -2466,6 +2465,28 @@ function openFoodManager(onDone){
       draftReceita = f.receita || '';
       render();
     }));
+  }
+
+  function askDeleteFood(id){
+    const f = list.find(x=>x.id===id);
+    if(!f) return;
+    host.innerHTML = `<div class="overlay" id="ovDelFood" style="align-items:center">
+      <div style="background:#fff; border-radius:16px; padding:20px; max-width:320px; width:calc(100% - 48px)">
+        <div style="font-size:.9rem; font-weight:600; margin-bottom:4px">Excluir "${esc(f.name)}"?</div>
+        <div style="font-size:.75rem; color:var(--ink-muted); margin-bottom:16px">Essa ação não pode ser desfeita.</div>
+        <div style="display:flex; gap:8px">
+          <button class="btn-secondary" id="btnCancelDelFood" style="flex:1">Cancelar</button>
+          <button class="btn-danger" id="btnConfirmDelFood">Excluir</button>
+        </div>
+      </div>
+    </div>`;
+    document.getElementById('ovDelFood').addEventListener('click', e=>{ if(e.target.id==='ovDelFood') render(); });
+    document.getElementById('btnCancelDelFood').addEventListener('click', render);
+    document.getElementById('btnConfirmDelFood').addEventListener('click', ()=>{
+      list = list.filter(x=> x.id!==id);
+      if(editingId===id){ editingId=null; draftName=''; draftReceita=''; }
+      render();
+    });
   }
   function saveFood(){
     const n = draftName.trim();
