@@ -2007,8 +2007,9 @@ function openCrecheManager(){
   function itemHtml(l){
     const periodo = l.dataSaida ? `${fmtDDMM(l.data)} a ${fmtDDMM(l.dataSaida)}` : '';
     const valorHtml = l.valor ? `R$ ${fmtValorBR(l.valor)}` : `<span class="badge" style="background:${cat.bgHex}; color:${cat.hex}">sem valor</span>`;
-    return `<div><div class="name">${esc(l.servicoNome)}${l.obs?' · '+esc(l.obs):''}</div>${periodo?`<div class="sub">${periodo}</div>`:''}</div>
-      <div style="font-weight:600; font-size:.85rem; flex-shrink:0; margin-left:10px">${valorHtml}</div>`;
+    return `<div style="flex:1; min-width:0; cursor:pointer" data-open="${l.id}"><div class="name">${esc(l.servicoNome)}${l.obs?' · '+esc(l.obs):''}</div>${periodo?`<div class="sub">${periodo}</div>`:''}</div>
+      <div style="font-weight:600; font-size:.85rem; flex-shrink:0; margin-left:10px">${valorHtml}</div>
+      <button class="del-btn" data-del="${l.id}">${icon('trash',14,'var(--ink-muted)')}</button>`;
   }
 
   function groupByDate(list){
@@ -2022,7 +2023,7 @@ function openCrecheManager(){
   }
 
   function groupCardHtml(g){
-    const rows = g.items.map((l,idx)=> `<div class="manager-item" data-open="${l.id}" style="cursor:pointer; margin-bottom:0; background:none; padding:8px 0; ${idx<g.items.length-1?'border-bottom:1px solid rgba(0,0,0,.05)':''}">${itemHtml(l)}</div>`).join('');
+    const rows = g.items.map((l,idx)=> `<div class="manager-item" style="margin-bottom:0; background:none; padding:8px 0; ${idx<g.items.length-1?'border-bottom:1px solid rgba(0,0,0,.05)':''}">${itemHtml(l)}</div>`).join('');
     return `<div class="manager-item" style="flex-direction:column; align-items:stretch; padding:4px 12px">
       <div class="hint" style="font-weight:600; margin-top:6px">${fmtDDMM(g.data)}</div>
       ${rows}
@@ -2077,6 +2078,10 @@ function openCrecheManager(){
       const lanc = crecheLancamentos.find(l=> l.id===row.dataset.open);
       if(lanc){ closeModal(); openCrecheModal(lanc); }
     }));
+    host.querySelectorAll('[data-del]').forEach(b=> b.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      askDeleteCrecheLanc(b.dataset.del);
+    }));
     document.getElementById('btnCopiarResumo').addEventListener('click', async ()=>{
       try{
         await navigator.clipboard.writeText(resumoTexto());
@@ -2093,6 +2098,29 @@ function openCrecheManager(){
         const s = crecheServicos.find(x=>x.id===inp.dataset.preco);
         if(s){ s.valor = parseValorBR(inp.value); persistCrecheServicos(); inp.value = fmtValorBR(s.valor); }
       });
+    });
+  }
+
+  function askDeleteCrecheLanc(id){
+    const l = crecheLancamentos.find(x=>x.id===id);
+    if(!l) return;
+    host.innerHTML = `<div class="overlay" id="ovDelCrLanc" style="align-items:center">
+      <div style="background:#fff; border-radius:16px; padding:20px; max-width:320px; width:calc(100% - 48px)">
+        <div style="font-size:.9rem; font-weight:600; margin-bottom:4px">Excluir "${esc(l.servicoNome)}"?</div>
+        <div style="font-size:.75rem; color:var(--ink-muted); margin-bottom:16px">Essa ação não pode ser desfeita.</div>
+        <div style="display:flex; gap:8px">
+          <button class="btn-secondary" id="btnCancelDelCrLanc" style="flex:1">Cancelar</button>
+          <button class="btn-danger" id="btnConfirmDelCrLanc">Excluir</button>
+        </div>
+      </div>
+    </div>`;
+    document.getElementById('ovDelCrLanc').addEventListener('click', e=>{ if(e.target.id==='ovDelCrLanc') render(); });
+    document.getElementById('btnCancelDelCrLanc').addEventListener('click', render);
+    document.getElementById('btnConfirmDelCrLanc').addEventListener('click', ()=>{
+      crecheLancamentos = crecheLancamentos.filter(x=> x.id!==id);
+      persistCrecheLancamentos();
+      if(l.entryId){ entries = entries.filter(e=> e.id!==l.entryId); persistEntries(); }
+      render();
     });
   }
 
@@ -2355,12 +2383,10 @@ function openSettings(){
     const importFileEl = document.getElementById('importFileInput');
     document.getElementById('reportBtn').addEventListener('click', ()=> openReport());
     document.getElementById('importBtn').addEventListener('click', ()=> importFileEl.click());
-    importFileEl.addEventListener('change', async (e)=>{
+    importFileEl.addEventListener('change', (e)=>{
       const file = e.target.files[0];
       if(!file) return;
-      if(!confirm('Isso substitui todos os dados atuais pelos do arquivo de backup. Continuar?')) { importFileEl.value=''; return; }
-      await importBackup(file);
-      importFileEl.value = '';
+      askConfirmImportBackup(file, importFileEl);
     });
     document.getElementById('ovSet').addEventListener('click', e=>{ if(e.target.id==='ovSet' && !saving) closeModal(); });
     document.getElementById('closeSet').addEventListener('click', ()=>{ if(!saving) closeModal(); });
@@ -2412,6 +2438,31 @@ function openSettings(){
       await loadProfilePhoto();
     });
   }
+
+  function askConfirmImportBackup(file, importFileEl){
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    overlay.id = 'ovConfirmImport';
+    overlay.style.alignItems = 'center';
+    overlay.innerHTML = `<div style="background:#fff; border-radius:16px; padding:20px; max-width:320px; width:calc(100% - 48px)">
+      <div style="font-size:.9rem; font-weight:600; margin-bottom:4px">Restaurar backup?</div>
+      <div style="font-size:.75rem; color:var(--ink-muted); margin-bottom:16px">Isso substitui todos os dados atuais pelos do arquivo. Essa ação não pode ser desfeita.</div>
+      <div style="display:flex; gap:8px">
+        <button class="btn-secondary" id="btnCancelImport" style="flex:1">Cancelar</button>
+        <button class="btn-danger" id="btnConfirmImport">Restaurar</button>
+      </div>
+    </div>`;
+    document.body.appendChild(overlay);
+    const cleanup = ()=>{ overlay.remove(); importFileEl.value=''; };
+    overlay.addEventListener('click', e=>{ if(e.target.id==='ovConfirmImport') cleanup(); });
+    overlay.querySelector('#btnCancelImport').addEventListener('click', cleanup);
+    overlay.querySelector('#btnConfirmImport').addEventListener('click', async ()=>{
+      overlay.remove();
+      await importBackup(file);
+      importFileEl.value = '';
+    });
+  }
+
   render();
 }
 
