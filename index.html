@@ -732,7 +732,7 @@ function pastMedGroupHtml(dayKey, dateStr, remedioEntries, searchQuery){
     const given = !!r.entry;
     const noteText = (given && r.entry.note && r.entry.note!==r.dose) ? r.entry.note : '';
     const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${r.horario?' · '+r.horario:''}${r.dose?' · '+esc(r.dose):''}${noteText?' · '+esc(noteText):''}`;
-    const inner = `<button data-med-edit="${m.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
+    const inner = `<button data-med-edit="${m.id}" data-horario="${esc(r.horario)}" data-med-date="${esc(dateStr)}" data-entry-id="${r.entry?r.entry.id:''}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
         <div class="entry-sub">${sub}</div>
       </button>
@@ -777,8 +777,9 @@ function pendingRowsHtml(activeSlots, adHocEntries){
   const medRows = sortedSlots.map(s=>{
     const m = s.med;
     const given = dosesGivenToday(m, s.horario).length > 0;
+    const givenEntry = dosesGivenToday(m, s.horario)[0] || null;
     const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${s.horario?' · '+s.horario:''}${s.dose?' · '+esc(s.dose):''}`;
-    const inner = `<button data-med-edit="${m.id}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
+    const inner = `<button data-med-edit="${m.id}" data-horario="${esc(s.horario)}" data-med-date="${todayStr()}" data-entry-id="${givenEntry?givenEntry.id:''}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
         <div class="entry-sub">${sub}</div>
       </button>
@@ -836,6 +837,68 @@ function toggleMedOnDate(medId, horario, dateStr, explicitTime){
   renderAll();
 }
 function toggleMedToday(medId, horario){ toggleMedOnDate(medId, horario, todayStr()); }
+
+function openMedDoseEdit(medId, horario, dateStr, entryId){
+  const host = document.getElementById('modalHost');
+  const med = meds.find(m=>m.id===medId);
+  if(!med) return;
+  const slot = (med.horarios||[]).find(h=>(h.time||'')===(horario||''));
+  const defaultDose = slot ? slot.dose : med.dose;
+  let entry = entryId ? entries.find(e=>e.id===entryId) : null;
+  let timeVal = entry ? fmtTime(entry.date) : (horario||'');
+  let doseVal = entry ? (entry.note||defaultDose||'') : (defaultDose||'');
+
+  function render(){
+    host.innerHTML = `<div class="overlay" id="ovMedDose">
+      <div class="sheet">
+        <div class="sheet-head">
+          <div class="sheet-title" style="color:${CATEGORIES.remedio.hex}">${icon('pill',17,CATEGORIES.remedio.hex)}<span style="color:var(--ink)">Editar dose · ${esc(med.name)}</span></div>
+          <button class="icon-btn" id="closeMedDose">${icon('x',18)}</button>
+        </div>
+        <div class="sheet-body">
+          <div class="hint" style="margin-bottom:14px">${fmtDateShort(dateStr)}</div>
+          <div class="field"><label>Horário administrado</label>${dtField('mdeTime','time',timeVal)}</div>
+          <div class="field"><label>Dose administrada</label><input id="mdeDose" autocomplete="off" value="${esc(doseVal)}" placeholder="dose (opcional)"/></div>
+          <button type="button" class="link-btn" id="mdeManage" style="color:var(--ink-muted)">Editar remédio (nome, horários, tipo)</button>
+        </div>
+        <div class="sheet-foot">
+          <button class="btn-secondary" id="mdeCancel">Cancelar</button>
+          <button class="btn-primary" id="mdeSave">Salvar</button>
+        </div>
+      </div>
+    </div>`;
+    wire();
+  }
+
+  function wire(){
+    document.getElementById('ovMedDose').addEventListener('click', e=>{ if(e.target.id==='ovMedDose') closeModal(); });
+    document.getElementById('closeMedDose').addEventListener('click', closeModal);
+    document.getElementById('mdeCancel').addEventListener('click', closeModal);
+    wireDtField('mdeTime', v=>{ timeVal=v; });
+    document.getElementById('mdeDose').addEventListener('input', e=>{ doseVal=e.target.value; });
+    document.getElementById('mdeManage').addEventListener('click', ()=>{ closeModal(); openMedManager(()=>renderAll(), medId); });
+    document.getElementById('mdeSave').addEventListener('click', save);
+  }
+
+  function save(){
+    const [y,mo,da] = dateStr.split('-').map(Number);
+    let date = new Date(y, mo-1, da);
+    if(timeVal){ const [hh,mm] = timeVal.split(':').map(Number); date.setHours(hh,mm,0,0); }
+    else date.setHours(12,0,0,0);
+    if(entry){
+      entry.date = date.toISOString();
+      entry.note = doseVal.trim();
+    } else {
+      entries.push({ id:genId(), category:'remedio', medId:med.id, horarioSlot:horario||'', title:med.name, note:doseVal.trim(), date:date.toISOString(), createdAt:Date.now() });
+    }
+    entries.sort((a,b)=> new Date(b.date)-new Date(a.date));
+    persistEntries();
+    closeModal();
+    renderAll();
+  }
+
+  render();
+}
 
 // ---------- render: filters ----------
 function renderFilters(){
@@ -1029,7 +1092,7 @@ function renderTimeline(){
   host.innerHTML = html;
   host.querySelectorAll('[data-id]').forEach(b=> b.addEventListener('click', ()=> openEntryModal(null, b.dataset.id)));
   host.querySelectorAll('[data-med]').forEach(b=> b.addEventListener('click', ()=> toggleMedOnDate(b.dataset.med, b.dataset.horario, b.dataset.medDate || todayStr())));
-  host.querySelectorAll('[data-med-edit]').forEach(b=> b.addEventListener('click', ()=> openMedManager(()=> renderAll(), b.dataset.medEdit)));
+  host.querySelectorAll('[data-med-edit]').forEach(b=> b.addEventListener('click', ()=> openMedDoseEdit(b.dataset.medEdit, b.dataset.horario, b.dataset.medDate, b.dataset.entryId)));
   host.querySelectorAll('[data-daysquare]').forEach(b=> b.addEventListener('click', ()=>{
     const key = b.dataset.daysquare;
     const card = host.querySelector(`[data-daycard="${CSS.escape(key)}"]`);
@@ -2637,9 +2700,10 @@ function openMedManager(onDone, jumpToId, startAdding){
       ${!isScheduled? `<div class="field"><label>Dose / instruções (opcional)</label><input id="d_dose" autocomplete="off" value="${esc(draft.dose)}" placeholder="ex: 1 comprimido"/></div>` : ''}
       ${isScheduled? `<div class="field"><label>Horários e posologia</label>
         <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:8px">
-          ${draft.horarios.map((h,i)=>`<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:${CATEGORIES.remedio.hex}18; border-radius:8px; padding:7px 8px 7px 12px">
-            <span style="font-size:.85rem; font-weight:600; color:${CATEGORIES.remedio.hex}">${h.time||'Sem horário'}${h.dose?' · '+esc(h.dose):''}</span>
-            <button type="button" data-rm-horario="${i}" style="background:none; border:none; padding:2px; display:flex; color:${CATEGORIES.remedio.hex}">${icon('x',13,CATEGORIES.remedio.hex)}</button>
+          ${draft.horarios.map((h,i)=>`<div style="display:flex; align-items:center; gap:6px">
+            <div style="flex:1">${dtField('d_horario_edit_'+i,'time',h.time)}</div>
+            <div style="flex:1"><input data-horario-dose-edit="${i}" autocomplete="off" value="${esc(h.dose||'')}" placeholder="dose (opcional)" style="width:100%; padding:11px 12px; border-radius:10px; border:1px solid #E5E0D4; font-family:inherit; font-size:16px; box-sizing:border-box"/></div>
+            <button type="button" data-rm-horario="${i}" style="background:none; border:none; padding:6px; display:flex; flex-shrink:0; color:var(--ink-muted)">${icon('x',15,'var(--ink-muted)')}</button>
           </div>`).join('')}
         </div>
         <div style="display:flex; gap:8px; align-items:flex-end">
@@ -2679,6 +2743,13 @@ function openMedManager(onDone, jumpToId, startAdding){
     if(isScheduled){
       wireDtField('d_horario_new', ()=>{}); // só atualiza o texto exibido; o commit real acontece ao sair do campo de dose
       document.getElementById('d_horario_dose').addEventListener('blur', ()=>{ flushPendingHorario(); syncDraftToList(); renderAddArea(); });
+      draft.horarios.forEach((h,i)=>{
+        wireDtField('d_horario_edit_'+i, v=>{ draft.horarios[i].time=v; syncDraftToList(); });
+      });
+      document.querySelectorAll('[data-horario-dose-edit]').forEach(inp=> inp.addEventListener('input', ()=>{
+        draft.horarios[Number(inp.dataset.horarioDoseEdit)].dose = inp.value;
+        syncDraftToList();
+      }));
       document.querySelectorAll('[data-rm-horario]').forEach(b=> b.addEventListener('click', ()=>{
         draft.horarios.splice(Number(b.dataset.rmHorario),1);
         syncDraftToList();
