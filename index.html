@@ -269,7 +269,7 @@ function icon(name, size=16, stroke='currentColor'){
 // ---------- helpers ----------
 // Atualizado a cada publicação, pra dar pra conferir se o app já pegou a
 // versão nova sem depender de "testa e reza" com cache do Safari.
-const APP_VERSION = '27/08/2026 21:22';
+const APP_VERSION = '27/08/2026 22:02';
 
 const genId = ()=> Date.now()+'-'+Math.random().toString(36).slice(2,8);
 const pad = n=> String(n).padStart(2,'0');
@@ -785,7 +785,8 @@ function pendingRowsHtml(activeSlots, adHocEntries){
     const m = s.med;
     const given = dosesGivenToday(m, s.horario).length > 0;
     const givenEntry = dosesGivenToday(m, s.horario)[0] || null;
-    const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${s.horario?' · '+s.horario:''}${s.dose?' · '+esc(s.dose):''}`;
+    const doseDisplay = given ? (givenEntry.note || s.dose || '') : (s.dose || '');
+    const sub = `${m.tipo==='continuo'?'Contínuo':'Até '+fmtDateShort(m.dataFim)}${s.horario?' · '+s.horario:''}${doseDisplay?' · '+esc(doseDisplay):''}`;
     const inner = `<button data-med-edit="${m.id}" data-horario="${esc(s.horario)}" data-med-date="${todayStr()}" data-entry-id="${givenEntry?givenEntry.id:''}" style="flex:1; min-width:0; text-align:left; background:none; border:none; padding:0; font-family:inherit; cursor:pointer; color:inherit">
         <div class="entry-title"><span style="color:${CATEGORIES.remedio.hex}; display:flex">${icon('pill',13,CATEGORIES.remedio.hex)}</span><span>${esc(m.name)}</span></div>
         <div class="entry-sub">${sub}</div>
