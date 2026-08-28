@@ -269,7 +269,7 @@ function icon(name, size=16, stroke='currentColor'){
 // ---------- helpers ----------
 // Atualizado a cada publicação, pra dar pra conferir se o app já pegou a
 // versão nova sem depender de "testa e reza" com cache do Safari.
-const APP_VERSION = '27/08/2026 22:02';
+const APP_VERSION = '28/08/2026 16:41';
 
 const genId = ()=> Date.now()+'-'+Math.random().toString(36).slice(2,8);
 const pad = n=> String(n).padStart(2,'0');
@@ -909,7 +909,7 @@ function openMedDoseEdit(medId, horario, dateStr, entryId){
 // ---------- render: filters ----------
 function renderFilters(){
   const host = document.getElementById('filterChips');
-  const all = CATEGORY_ORDER.map(k=>[k, CATEGORIES[k].label, CATEGORIES[k].color]);
+  const all = [...CATEGORY_ORDER, 'creche'].map(k=>[k, CATEGORIES[k].label, CATEGORIES[k].color]);
   host.innerHTML = all.map(([key,label,color])=>
     `<button class="chip-filter ${filter===key?'active':''}" style="${filter===key?`background:${color}`:''}" data-f="${key}">${label}</button>`
   ).join('');
