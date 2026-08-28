@@ -269,7 +269,7 @@ function icon(name, size=16, stroke='currentColor'){
 // ---------- helpers ----------
 // Atualizado a cada publicação, pra dar pra conferir se o app já pegou a
 // versão nova sem depender de "testa e reza" com cache do Safari.
-const APP_VERSION = '27/08/2026 10:34';
+const APP_VERSION = '27/08/2026 21:22';
 
 const genId = ()=> Date.now()+'-'+Math.random().toString(36).slice(2,8);
 const pad = n=> String(n).padStart(2,'0');
@@ -954,9 +954,11 @@ function entryRowHtml(e){
     badge = `<span class="badge" style="background:${bg}; color:${fg}; flex-shrink:0">${e.gravidade}</span>`;
   }
   const sub = entrySubtitle(e);
+  const hasPhoto = (e.photoIds && e.photoIds.length) || e.photoId || e.photo || (e.anexos && e.anexos.length) || e.anexoId;
+  const photoIcon = hasPhoto ? `<span style="color:var(--ink-muted); display:flex; flex-shrink:0">${icon('camera',13,'var(--ink-muted)')}</span>` : '';
   return `<button class="entry-row" data-id="${e.id}">
     <div class="entry-top">
-      <div class="entry-title"><span style="color:${cat.hex}; display:flex">${icon(cat.icon,13,cat.hex)}</span><span style="flex:1; min-width:0">${esc(e.title)}</span>${badge}</div>
+      <div class="entry-title"><span style="color:${cat.hex}; display:flex">${icon(cat.icon,13,cat.hex)}</span><span style="flex:1; min-width:0">${esc(e.title)}</span>${badge}${photoIcon}</div>
       ${(e.category!=='creche' && !e.noTime) ? `<span class="entry-time">${fmtTime(e.date)}</span>` : ''}
     </div>
     ${sub?`<div class="entry-sub">${esc(sub)}</div>`:''}
@@ -1175,7 +1177,12 @@ function blobToDataUrl(blob){
 async function exportBackup(silent){
   try{
     const photoIds = new Set();
-    entries.forEach(e=>{ if(e.photoId) photoIds.add(e.photoId); });
+    entries.forEach(e=>{
+      if(e.photoId) photoIds.add(e.photoId);
+      if(e.photoIds) e.photoIds.forEach(id=> photoIds.add(id));
+      if(e.anexoId) photoIds.add(e.anexoId);
+      if(e.anexos) e.anexos.forEach(a=> a.id && photoIds.add(a.id));
+    });
     if(settings.profilePhotoId) photoIds.add(settings.profilePhotoId);
     const photos = {};
     for(const id of photoIds){
@@ -1305,7 +1312,7 @@ function pesoChartHtml(){
 
 function emptyForm(cat){
   const now = new Date();
-  return { title:'', quantidade:'', dateD: todayStr(), dateT: `${pad(now.getHours())}:${pad(now.getMinutes())}`, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:'', quemFez:'', cobrarViaCreche:false, photo:'', photoBlob:null, photoId:'', removedPhoto:false, anexoUrl:'', anexoBlob:null, anexoId:'', anexoName:'', anexoType:'', removedAnexo:false };
+  return { title:'', quantidade:'', dateD: todayStr(), dateT: `${pad(now.getHours())}:${pad(now.getMinutes())}`, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:'', quemFez:'', cobrarViaCreche:false, photoItems:[], anexoItems:[] };
 }
 
 function openEntryModal(category, editId){
@@ -1321,8 +1328,11 @@ function openEntryModal(category, editId){
     note: editing.note||'', value: editing.value ?? '', gravidade: editing.gravidade||'',
     comoComeu: editing.comoComeu||'', clinica: editing.clinica||'', tipoExame: editing.tipoExame||'',
     quemFez: editing.quemFez||'', cobrarViaCreche: !!editing.cobrarViaCreche,
-    photo: editing.photo||'', photoBlob:null, photoId: editing.photoId||'', removedPhoto:false,
-    anexoUrl:'', anexoBlob:null, anexoId: editing.anexoId||'', anexoName: editing.anexoName||'', anexoType: editing.anexoType||'', removedAnexo:false
+    photoItems: (editing.photoIds && editing.photoIds.length ? editing.photoIds.map(id=>({id, blob:null, url:''}))
+      : editing.photoId ? [{id:editing.photoId, blob:null, url:''}]
+      : editing.photo ? [{id:null, blob:null, url:editing.photo}] : []),
+    anexoItems: (editing.anexos && editing.anexos.length ? editing.anexos.map(a=>({id:a.id, blob:null, url:'', name:a.name||'', type:a.type||''}))
+      : editing.anexoId ? [{id:editing.anexoId, blob:null, url:'', name:editing.anexoName||'', type:editing.anexoType||''}] : [])
   } : emptyForm(category);
 
   const cat = CATEGORIES[category];
@@ -1418,10 +1428,12 @@ function openEntryModal(category, editId){
         <div class="pickgrid" id="icPick" style="margin-top:6px">${suggestChips('intercorrencia', form.title)}</div>
       </div>
       <div class="field"><label>Gravidade (opcional)</label><div class="row2">${GRAVIDADES.map(g=>`<button type="button" class="pick-btn ${form.gravidade===g?'sel':''}" style="flex:1; ${form.gravidade===g?`background:${cat.hex}`:''}" data-g="${g}">${g}</button>`).join('')}</div></div>
-      <div class="field"><label>Foto (opcional)</label>
-        ${form.photo ? `<div class="photo-preview"><img id="photoThumb" src="${form.photo}" style="cursor:pointer"/><button type="button" id="removePhoto" class="photo-remove">${icon('x',13,'#fff')}</button></div>`
-          : `<button type="button" id="addPhotoBtn" class="add-trigger">${icon('camera',15)} Adicionar foto</button>`}
-        <input type="file" id="photoInput" accept="image/*" style="display:none"/>
+      <div class="field"><label>Fotos (opcional)</label>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; ${form.photoItems.length?'margin-bottom:8px':''}">
+          ${form.photoItems.map((p,i)=> p.url ? `<div class="photo-preview" data-photo-view="${i}"><img src="${p.url}" style="cursor:pointer"/><button type="button" class="photo-remove" data-photo-remove="${i}">${icon('x',13,'#fff')}</button></div>` : '').join('')}
+        </div>
+        <button type="button" id="addPhotoBtn" class="add-trigger">${icon('camera',15)} Adicionar foto</button>
+        <input type="file" id="photoInput" accept="image/*" multiple style="display:none"/>
       </div>`;
     }
     if(category==='consulta'){
@@ -1431,13 +1443,18 @@ function openEntryModal(category, editId){
       <div class="field"><label>Clínica / veterinário (opcional)</label><input id="f_clinica" value="${esc(form.clinica)}" placeholder="ex: Dra. Ana, Clínica Pet+"/>
         <div class="pickgrid" id="clinicaPick" style="margin-top:6px">${suggestChips('clinica', form.clinica)}</div>
       </div>
-      <div class="field"><label>Anexo (opcional)</label>
-        ${form.anexoUrl
-          ? (form.anexoType && form.anexoType.startsWith('image/')
-              ? `<div class="photo-preview"><img id="anexoThumb" src="${form.anexoUrl}" style="cursor:pointer"/><button type="button" id="removeAnexo" class="photo-remove">${icon('x',13,'#fff')}</button></div>`
-              : `<div class="manager-item" style="max-width:280px"><a href="${form.anexoUrl}" target="_blank" rel="noreferrer" style="color:${cat.hex}; font-size:.85rem; font-weight:500; text-decoration:none">${esc(form.anexoName||'Ver anexo')}</a><button type="button" id="removeAnexo" class="del-btn">${icon('x',14,'var(--ink-muted)')}</button></div>`)
-          : `<button type="button" id="addAnexoBtn" class="add-trigger">${icon('camera',15)} Anexar foto ou PDF</button>`}
-        <input type="file" id="anexoInput" accept="image/*,application/pdf" style="display:none"/>
+      <div class="field"><label>Anexos (opcional)</label>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; ${form.anexoItems.length?'margin-bottom:8px':''}">
+          ${form.anexoItems.map((a,i)=>{
+            if(!a.url) return '';
+            const isImg = a.type && a.type.startsWith('image/');
+            return isImg
+              ? `<div class="photo-preview" data-anexo-view="${i}"><img src="${a.url}" style="cursor:pointer"/><button type="button" class="photo-remove" data-anexo-remove="${i}">${icon('x',13,'#fff')}</button></div>`
+              : `<div class="manager-item" style="max-width:280px"><a href="${a.url}" target="_blank" rel="noreferrer" style="color:${cat.hex}; font-size:.85rem; font-weight:500; text-decoration:none">${esc(a.name||'Ver anexo')}</a><button type="button" class="del-btn" data-anexo-remove="${i}">${icon('x',14,'var(--ink-muted)')}</button></div>`;
+          }).join('')}
+        </div>
+        <button type="button" id="addAnexoBtn" class="add-trigger">${icon('camera',15)} Anexar foto ou PDF</button>
+        <input type="file" id="anexoInput" accept="image/*,application/pdf" multiple style="display:none"/>
       </div>`;
     }
     if(category==='procedimento'){
@@ -1588,61 +1605,67 @@ function openEntryModal(category, editId){
   function wirePhoto(){
     const addBtn = document.getElementById('addPhotoBtn');
     const input = document.getElementById('photoInput');
-    const removeBtn = document.getElementById('removePhoto');
-    const thumb = document.getElementById('photoThumb');
     if(addBtn && input) addBtn.addEventListener('click', ()=> input.click());
     if(input) input.addEventListener('change', async (e)=>{
-      const file = e.target.files[0];
-      if(!file) return;
-      try{
-        const blob = await resizeImageFile(file);
-        form.photoBlob = blob;
-        form.photo = URL.createObjectURL(blob);
-        form.removedPhoto = false;
-      }catch(err){
-        console.error('Erro ao processar foto', err);
-        showWarning('Não consegui processar essa foto. Tenta outra.');
+      const files = Array.from(e.target.files||[]);
+      if(!files.length) return;
+      for(const file of files){
+        try{
+          const blob = await resizeImageFile(file);
+          form.photoItems.push({ id:null, blob, url:URL.createObjectURL(blob) });
+        }catch(err){
+          console.error('Erro ao processar foto', err);
+          showWarning('Não consegui processar uma das fotos. Tenta de novo.');
+        }
       }
+      input.value = '';
       refreshBody();
     });
-    if(removeBtn) removeBtn.addEventListener('click', ()=>{
-      form.photo=''; form.photoBlob=null; form.removedPhoto = true;
+    document.querySelectorAll('[data-photo-remove]').forEach(b=> b.addEventListener('click', ()=>{
+      const idx = Number(b.dataset.photoRemove);
+      const item = form.photoItems[idx];
+      if(item && item.id){ form.removedPhotoIds = form.removedPhotoIds||[]; form.removedPhotoIds.push(item.id); }
+      form.photoItems.splice(idx,1);
       refreshBody();
-    });
-    if(thumb) thumb.addEventListener('click', ()=> openLightbox(form.photo));
+    }));
+    document.querySelectorAll('[data-photo-view]').forEach(el=> el.addEventListener('click', ()=>{
+      const item = form.photoItems[Number(el.dataset.photoView)];
+      if(item && item.url) openLightbox(item.url);
+    }));
     wireAnexo();
   }
 
   function wireAnexo(){
     const addBtn = document.getElementById('addAnexoBtn');
     const input = document.getElementById('anexoInput');
-    const removeBtn = document.getElementById('removeAnexo');
-    const thumb = document.getElementById('anexoThumb');
     if(addBtn && input) addBtn.addEventListener('click', ()=> input.click());
     if(input) input.addEventListener('change', async (e)=>{
-      const file = e.target.files[0];
-      if(!file) return;
-      try{
-        if(file.type && file.type.startsWith('image/')){
-          form.anexoBlob = await resizeImageFile(file);
-        } else {
-          form.anexoBlob = file;
+      const files = Array.from(e.target.files||[]);
+      if(!files.length) return;
+      for(const file of files){
+        try{
+          const blob = (file.type && file.type.startsWith('image/')) ? await resizeImageFile(file) : file;
+          form.anexoItems.push({ id:null, blob, url:URL.createObjectURL(blob), name:file.name, type:file.type });
+        }catch(err){
+          console.error('Erro ao processar anexo', err);
+          showWarning('Não consegui processar um dos arquivos. Tenta de novo.');
         }
-        form.anexoUrl = URL.createObjectURL(form.anexoBlob);
-        form.anexoName = file.name;
-        form.anexoType = file.type;
-        form.removedAnexo = false;
-      }catch(err){
-        console.error('Erro ao processar anexo', err);
-        showWarning('Não consegui processar esse arquivo. Tenta outro.');
       }
+      input.value = '';
       refreshBody();
     });
-    if(removeBtn) removeBtn.addEventListener('click', ()=>{
-      form.anexoUrl=''; form.anexoBlob=null; form.anexoName=''; form.anexoType=''; form.removedAnexo = true;
+    document.querySelectorAll('[data-anexo-remove]').forEach(b=> b.addEventListener('click', (ev)=>{
+      ev.stopPropagation();
+      const idx = Number(b.dataset.anexoRemove);
+      const item = form.anexoItems[idx];
+      if(item && item.id){ form.removedAnexoIds = form.removedAnexoIds||[]; form.removedAnexoIds.push(item.id); }
+      form.anexoItems.splice(idx,1);
       refreshBody();
-    });
-    if(thumb) thumb.addEventListener('click', ()=> openLightbox(form.anexoUrl));
+    }));
+    document.querySelectorAll('[data-anexo-view]').forEach(el=> el.addEventListener('click', ()=>{
+      const item = form.anexoItems[Number(el.dataset.anexoView)];
+      if(item && item.url) openLightbox(item.url);
+    }));
   }
   function refreshBody(){ document.getElementById('bodyEntry').innerHTML = fieldsHtml(); wireBodyOnly(); toggleSave(); }
   function wireBodyOnly(){
@@ -1714,41 +1737,49 @@ function openEntryModal(category, editId){
     else if(category==='exame'){ entry.title=form.tipoExame; entry.tipoExame=form.tipoExame; entry.quemFez=form.quemFez.trim(); entry.cobrarViaCreche=!!form.cobrarViaCreche; if(editing && editing.crecheLancId) entry.crecheLancId = editing.crecheLancId; }
     else if(category==='intercorrencia'){
       entry.title=form.title.trim(); entry.gravidade=form.gravidade;
-      if(form.photoBlob){
-        const newId = genId();
+      const finalPhotoIds = [];
+      for(const item of form.photoItems){
         try{
-          await idbPutPhoto(newId, form.photoBlob);
-          entry.photoId = newId;
-          if(editing && editing.photoId && editing.photoId!==newId) idbDeletePhoto(editing.photoId).catch(()=>{});
+          if(item.blob){
+            const newId = genId();
+            await idbPutPhoto(newId, item.blob);
+            finalPhotoIds.push(newId);
+          } else if(item.id){
+            finalPhotoIds.push(item.id);
+          } else if(item.url){
+            // foto legada (salva antes do IndexedDB existir) — migra agora
+            const blob = await (await fetch(item.url)).blob();
+            const newId = genId();
+            await idbPutPhoto(newId, blob);
+            finalPhotoIds.push(newId);
+          }
         }catch(err){
           console.error('Erro ao salvar foto', err);
-          showWarning('Não consegui salvar a foto, mas o resto do registro foi salvo.');
+          showWarning('Não consegui salvar uma das fotos, mas o resto do registro foi salvo.');
         }
-      } else if(form.photoId && !form.removedPhoto){
-        entry.photoId = form.photoId;
-      } else if(form.removedPhoto && editing && editing.photoId){
-        idbDeletePhoto(editing.photoId).catch(()=>{});
-      } else if(!form.removedPhoto && editing && editing.photo){
-        entry.photo = editing.photo; // legacy entries saved before the IndexedDB migration
       }
+      (form.removedPhotoIds||[]).forEach(id=> idbDeletePhoto(id).catch(()=>{}));
+      if(finalPhotoIds.length) entry.photoIds = finalPhotoIds;
     }
     else if(category==='consulta'){
       entry.title=form.title.trim(); entry.clinica=form.clinica.trim();
-      if(form.anexoBlob){
-        const newId = genId();
+      const finalAnexos = [];
+      for(const item of form.anexoItems){
         try{
-          await idbPutPhoto(newId, form.anexoBlob);
-          entry.anexoId = newId; entry.anexoName = form.anexoName; entry.anexoType = form.anexoType;
-          if(editing && editing.anexoId && editing.anexoId!==newId) idbDeletePhoto(editing.anexoId).catch(()=>{});
+          if(item.blob){
+            const newId = genId();
+            await idbPutPhoto(newId, item.blob);
+            finalAnexos.push({ id:newId, name:item.name||'', type:item.type||'' });
+          } else if(item.id){
+            finalAnexos.push({ id:item.id, name:item.name||'', type:item.type||'' });
+          }
         }catch(err){
           console.error('Erro ao salvar anexo', err);
-          showWarning('Não consegui salvar o anexo, mas o resto foi salvo.');
+          showWarning('Não consegui salvar um dos anexos, mas o resto foi salvo.');
         }
-      } else if(form.anexoId && !form.removedAnexo){
-        entry.anexoId = form.anexoId; entry.anexoName = editing?.anexoName||''; entry.anexoType = editing?.anexoType||'';
-      } else if(form.removedAnexo && editing && editing.anexoId){
-        idbDeletePhoto(editing.anexoId).catch(()=>{});
       }
+      (form.removedAnexoIds||[]).forEach(id=> idbDeletePhoto(id).catch(()=>{}));
+      if(finalAnexos.length) entry.anexos = finalAnexos;
     }
     else if(category==='alimentacao'){ entry.title=form.title.trim(); entry.comoComeu=form.comoComeu; entry.quantidade=form.quantidade.trim(); }
     else if(category==='procedimento'){
@@ -1803,21 +1834,27 @@ function openEntryModal(category, editId){
 
   render();
 
-  if(editing && editing.photoId){
-    idbGetPhoto(editing.photoId).then(blob=>{
-      if(blob && document.getElementById('bodyEntry')){
-        form.photo = URL.createObjectURL(blob);
-        refreshBody();
+  if(editing){
+    form.photoItems.forEach(item=>{
+      if(item.id && !item.url){
+        idbGetPhoto(item.id).then(blob=>{
+          if(blob && document.getElementById('bodyEntry')){
+            item.url = URL.createObjectURL(blob);
+            refreshBody();
+          }
+        }).catch(err=> console.error('Erro ao carregar foto', err));
       }
-    }).catch(err=> console.error('Erro ao carregar foto', err));
-  }
-  if(editing && editing.anexoId){
-    idbGetPhoto(editing.anexoId).then(blob=>{
-      if(blob && document.getElementById('bodyEntry')){
-        form.anexoUrl = URL.createObjectURL(blob);
-        refreshBody();
+    });
+    form.anexoItems.forEach(item=>{
+      if(item.id && !item.url){
+        idbGetPhoto(item.id).then(blob=>{
+          if(blob && document.getElementById('bodyEntry')){
+            item.url = URL.createObjectURL(blob);
+            refreshBody();
+          }
+        }).catch(err=> console.error('Erro ao carregar anexo', err));
       }
-    }).catch(err=> console.error('Erro ao carregar anexo', err));
+    });
   }
 }
 
@@ -2151,7 +2188,9 @@ function openConfirmDelete(id){
   document.getElementById('btnConfirmDel').addEventListener('click', ()=>{
     const toRemove = entries.find(e=>e.id===id);
     if(toRemove && toRemove.photoId) idbDeletePhoto(toRemove.photoId).catch(()=>{});
+    if(toRemove && toRemove.photoIds) toRemove.photoIds.forEach(id=> idbDeletePhoto(id).catch(()=>{}));
     if(toRemove && toRemove.anexoId) idbDeletePhoto(toRemove.anexoId).catch(()=>{});
+    if(toRemove && toRemove.anexos) toRemove.anexos.forEach(a=> a.id && idbDeletePhoto(a.id).catch(()=>{}));
     if(toRemove && toRemove.category==='creche' && toRemove.crecheId){
       crecheLancamentos = crecheLancamentos.filter(l=> l.id!==toRemove.crecheId);
       persistCrecheLancamentos();
