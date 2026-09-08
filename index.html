@@ -1499,6 +1499,37 @@ function openEntryModal(category, editId){
     return list.map(c=>`<button type="button" class="pick-btn" data-sugg="${kind}" data-val="${esc(c)}">${esc(c)}</button>`).join('');
   }
 
+  function wireSuggChips(){
+    document.querySelectorAll('[data-sugg]').forEach(b=>{
+      let timer=null, longPressed=false;
+      const clearTimer=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
+      b.addEventListener('pointerdown', ()=>{
+        longPressed=false;
+        timer=setTimeout(()=>{
+          longPressed=true;
+          const kind=b.dataset.sugg, val=b.dataset.val;
+          if(confirm(`Remover "${val}" das sugestões?`)){
+            chips[kind] = chips[kind].filter(c=>c!==val);
+            persistChips(kind);
+            refreshBody();
+          }
+        }, 550);
+      });
+      b.addEventListener('pointerup', clearTimer);
+      b.addEventListener('pointerleave', clearTimer);
+      b.addEventListener('pointercancel', clearTimer);
+      b.addEventListener('click', ()=>{
+        if(longPressed){ longPressed=false; return; }
+        const kind=b.dataset.sugg, val=b.dataset.val;
+        if(kind==='clinica') form.clinica=val;
+        else if(kind==='quantidade') form.quantidade=val;
+        else if(kind==='profissional') form.quemFez=val;
+        else form.title=val;
+        refreshBody();
+      });
+    });
+  }
+
   function render(){
     host.innerHTML = `<div class="overlay" id="ovEntry">
       <div class="sheet" id="sheetEntry">
@@ -1584,14 +1615,7 @@ function openEntryModal(category, editId){
     const tipoExameInput = document.getElementById('f_tipoExame');
     if(tipoExameInput) tipoExameInput.addEventListener('input', e=> form.tipoExame=e.target.value);
 
-    document.querySelectorAll('[data-sugg]').forEach(b=> b.addEventListener('click', ()=>{
-      const kind=b.dataset.sugg, val=b.dataset.val;
-      if(kind==='clinica') form.clinica=val;
-      else if(kind==='quantidade') form.quantidade=val;
-      else if(kind==='profissional') form.quemFez=val;
-      else form.title=val;
-      refreshBody();
-    }));
+    wireSuggChips();
 
     const quemFezInput1 = document.getElementById('f_quemFez'); if(quemFezInput1) quemFezInput1.addEventListener('input', e=> form.quemFez=e.target.value);
     document.querySelectorAll('[data-cobrar]').forEach(b=> b.addEventListener('click', ()=>{ form.cobrarViaCreche = b.dataset.cobrar==='sim'; refreshBody(); }));
@@ -1712,7 +1736,7 @@ function openEntryModal(category, editId){
     document.querySelectorAll('[data-g]').forEach(b=> b.addEventListener('click', ()=>{ form.gravidade = form.gravidade===b.dataset.g ? '' : b.dataset.g; refreshBody(); }));
     wirePhoto();
     const tipoExameInput2 = document.getElementById('f_tipoExame'); if(tipoExameInput2) tipoExameInput2.addEventListener('input', e=> form.tipoExame=e.target.value);
-    document.querySelectorAll('[data-sugg]').forEach(b=> b.addEventListener('click', ()=>{ const kind=b.dataset.sugg, val=b.dataset.val; if(kind==='clinica') form.clinica=val; else if(kind==='quantidade') form.quantidade=val; else if(kind==='profissional') form.quemFez=val; else form.title=val; refreshBody(); }));
+    wireSuggChips();
     const quemFezInput = document.getElementById('f_quemFez'); if(quemFezInput) quemFezInput.addEventListener('input', e=> form.quemFez=e.target.value);
     document.querySelectorAll('[data-cobrar]').forEach(b=> b.addEventListener('click', ()=>{ form.cobrarViaCreche = b.dataset.cobrar==='sim'; refreshBody(); }));
   }
