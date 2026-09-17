@@ -577,7 +577,8 @@ let chips = {
   clinica: store.get('otto:clinica-chips', []),
   procedimento: store.get('otto:procedimento-chips', []),
   quantidade: store.get('otto:quantidade-chips', []),
-  profissional: store.get('otto:profissional-chips', [])
+  profissional: store.get('otto:profissional-chips', []),
+  observacao: store.get('otto:observacao-chips', [])
 };
 let settings = store.get('otto:settings', {sheetLink:'', crecheLink:''});
 const CRECHE_LINK_ANTIGO = 'https://claude.ai/public/artifacts/206f7428-4058-44e8-b558-5db49e3a9673';
@@ -1509,7 +1510,7 @@ function openEntryModal(category, editId){
         <div style="flex:1.3">${dtField('f_dateD','date',form.dateD)}</div>
         <div style="flex:1">${dtField('f_dateT','time',form.dateT)}</div>
       </div></div>
-      <div class="field"><label>${category==='exame'?'Observação (ex: resultado, ver planilha)':'Observação (opcional)'}</label><textarea id="f_note">${esc(form.note)}</textarea></div>`;
+      <div class="field"><label>${category==='exame'?'Observação (ex: resultado, ver planilha)':'Observação (opcional)'}</label><textarea id="f_note">${esc(form.note)}</textarea>${category==='alimentacao'?`<div class="pickgrid" id="obsPick" style="margin-top:6px">${suggestChips('observacao', form.note)}</div>`:''}</div>`;
     return h;
   }
 
@@ -1544,6 +1545,7 @@ function openEntryModal(category, editId){
         if(kind==='clinica') form.clinica=val;
         else if(kind==='quantidade') form.quantidade=val;
         else if(kind==='profissional') form.quemFez=val;
+        else if(kind==='observacao') form.note=val;
         else form.title=val;
         refreshBody();
       });
@@ -1872,6 +1874,7 @@ function openEntryModal(category, editId){
       }
     }
     if(category==='alimentacao' && entry.quantidade && !chips.quantidade.includes(entry.quantidade)){ chips.quantidade.push(entry.quantidade); persistChips('quantidade'); }
+    if(category==='alimentacao' && entry.note && !chips.observacao.includes(entry.note)){ chips.observacao.push(entry.note); persistChips('observacao'); }
 
     closeModal();
     renderAll();
