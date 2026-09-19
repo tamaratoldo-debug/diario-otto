@@ -990,6 +990,27 @@ function entryRowHtml(e){
 const normalizeSearch = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const sortMedsByName = (a,b)=> normalizeSearch(a.name).localeCompare(normalizeSearch(b.name), 'pt');
 
+function expandCrecheSpans(list){
+  const out = [];
+  for(const e of list){
+    if(e.category==='creche' && e.crecheId){
+      const lanc = crecheLancamentos.find(l=> l.id===e.crecheId);
+      if(lanc && lanc.dataSaida && lanc.dataSaida > lanc.data){
+        const timePart = new Date(e.date).toTimeString().slice(0,8);
+        const cur = new Date(lanc.data+'T00:00:00');
+        const end = new Date(lanc.dataSaida+'T00:00:00');
+        while(cur<=end){
+          out.push({...e, date: new Date(toLocalDateStr(cur)+'T'+timePart).toISOString()});
+          cur.setDate(cur.getDate()+1);
+        }
+        continue;
+      }
+    }
+    out.push(e);
+  }
+  return out;
+}
+
 function renderTimeline(){
   let list = entries.slice();
   if(filter!=='todos') list = list.filter(e=>e.category===filter);
@@ -998,6 +1019,7 @@ function renderTimeline(){
     const q = normalizeSearch(search);
     list = list.filter(e => normalizeSearch(e.title).includes(q) || normalizeSearch(e.note).includes(q) || normalizeSearch(e.clinica).includes(q) || normalizeSearch(e.quantidade).includes(q));
   }
+  list = expandCrecheSpans(list);
   list.sort((a,b)=> new Date(b.date)-new Date(a.date));
 
   const host = document.getElementById('timeline');
