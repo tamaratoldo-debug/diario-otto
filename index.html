@@ -1356,7 +1356,7 @@ function pesoChartHtml(){
 
 function emptyForm(cat){
   const now = new Date();
-  return { title:'', quantidade:'', dateD: todayStr(), dateT: `${pad(now.getHours())}:${pad(now.getMinutes())}`, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:'', quemFez:'', cobrarViaCreche:false, photoItems:[], anexoItems:[] };
+  return { title:'', quantidade:'', dateD: todayStr(), dateT: `${pad(now.getHours())}:${pad(now.getMinutes())}`, note:'', value:'', gravidade:'', comoComeu:'', clinica:'', tipoExame:'', quemFez:'', cobrarViaCreche:false, photoItems:[], anexoItems:[], medId:'', horarioSlot:'' };
 }
 
 function openEntryModal(category, editId){
@@ -1372,6 +1372,7 @@ function openEntryModal(category, editId){
     note: editing.note||'', value: editing.value ?? '', gravidade: editing.gravidade||'',
     comoComeu: editing.comoComeu||'', clinica: editing.clinica||'', tipoExame: editing.tipoExame||'',
     quemFez: editing.quemFez||'', cobrarViaCreche: !!editing.cobrarViaCreche,
+    medId: editing.medId||'', horarioSlot: editing.horarioSlot||'',
     photoItems: (editing.photoIds && editing.photoIds.length ? editing.photoIds.map(id=>({id, blob:null, url:''}))
       : editing.photoId ? [{id:editing.photoId, blob:null, url:''}]
       : editing.photo ? [{id:null, blob:null, url:editing.photo}] : []),
@@ -1455,7 +1456,8 @@ function openEntryModal(category, editId){
             const horario = first ? first.time : '';
             const dose = first ? first.dose : m.dose;
             const sub = `${horario}${horario&&dose?' · ':''}${dose?esc(dose):''}`;
-            return `<button type="button" class="med-pick-btn ${form.title===m.name?'sel':''}" style="${form.title===m.name?`background:${cat.hex}`:''}" data-id="${m.id}" data-name="${esc(m.name)}" data-dose="${esc(dose||'')}" data-horario="${esc(horario)}">
+            const isSel = form.medId ? form.medId===m.id : form.title===m.name;
+            return `<button type="button" class="med-pick-btn ${isSel?'sel':''}" style="${isSel?`background:${cat.hex}`:''}" data-id="${m.id}" data-name="${esc(m.name)}" data-dose="${esc(dose||'')}" data-horario="${esc(horario)}">
               <div class="mp-name">${esc(m.name)}</div>
               ${sub?`<div class="mp-sub">${sub}</div>`:''}
             </button>`;
@@ -1616,6 +1618,8 @@ function openEntryModal(category, editId){
     const medPick = document.getElementById('medPick');
     if(medPick && !quickPick) medPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{
       form.title=b.dataset.name;
+      form.medId=b.dataset.id;
+      form.horarioSlot=b.dataset.horario||'';
       if(!form.note && b.dataset.dose) form.note=b.dataset.dose;
       if(!editing && b.dataset.horario) form.dateT=b.dataset.horario;
       refreshBody();
@@ -1747,7 +1751,7 @@ function openEntryModal(category, editId){
     wireDtField('f_dateT', v=> form.dateT=v);
     const foodPick = document.getElementById('foodPick'); if(foodPick) foodPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.title=b.dataset.name; refreshBody(); }));
     const openFM = document.getElementById('openFoodMgr'); if(openFM) openFM.addEventListener('click', ()=> openFoodManager(()=>{ refreshBody(); }));
-    const medPick = document.getElementById('medPick'); if(medPick) medPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.title=b.dataset.name; if(!form.note && b.dataset.dose) form.note=b.dataset.dose; if(!editing && b.dataset.horario) form.dateT=b.dataset.horario; refreshBody(); }));
+    const medPick = document.getElementById('medPick'); if(medPick) medPick.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ form.title=b.dataset.name; form.medId=b.dataset.id; form.horarioSlot=b.dataset.horario||''; if(!form.note && b.dataset.dose) form.note=b.dataset.dose; if(!editing && b.dataset.horario) form.dateT=b.dataset.horario; refreshBody(); }));
     if(quickPick){
       document.querySelectorAll('[data-quicklog]').forEach(b=> b.addEventListener('click', ()=>{
         const m = meds.find(x=>x.id===b.dataset.quicklog);
@@ -1855,6 +1859,7 @@ function openEntryModal(category, editId){
       entry.title=form.title.trim(); entry.quemFez=form.quemFez.trim(); entry.cobrarViaCreche=!!form.cobrarViaCreche;
       if(editing && editing.crecheLancId) entry.crecheLancId = editing.crecheLancId;
     }
+    else if(category==='remedio'){ entry.title=form.title.trim(); entry.medId=form.medId||null; entry.horarioSlot=form.horarioSlot||''; }
     else entry.title=form.title.trim();
 
     if(editing) entries = entries.map(e=> e.id===editing.id? entry : e);
