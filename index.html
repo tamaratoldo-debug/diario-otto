@@ -798,7 +798,10 @@ function openMedDoseEdit(medId, horario, dateStr, entryId){
       <div class="sheet">
         <div class="sheet-head">
           <div class="sheet-title" style="color:${CATEGORIES.remedio.hex}">${icon('pill',17,CATEGORIES.remedio.hex)}<span style="color:var(--ink)">Editar dose · ${esc(med.name)}</span></div>
-          <button class="icon-btn" id="closeMedDose">${icon('x',18)}</button>
+          <div style="display:flex; gap:8px">
+            ${entry?`<button class="icon-btn danger" id="delMedDose">${icon('trash',17,'#A8473A')}</button>`:''}
+            <button class="icon-btn" id="closeMedDose">${icon('x',18)}</button>
+          </div>
         </div>
         <div class="sheet-body">
           <div class="hint" style="margin-bottom:14px">Editando só a dose deste dia · ${fmtDateShort(dateStr)}</div>
@@ -818,6 +821,8 @@ function openMedDoseEdit(medId, horario, dateStr, entryId){
     document.getElementById('ovMedDose').addEventListener('click', e=>{ if(e.target.id==='ovMedDose') closeModal(); });
     document.getElementById('closeMedDose').addEventListener('click', closeModal);
     document.getElementById('mdeCancel').addEventListener('click', closeModal);
+    const delBtn = document.getElementById('delMedDose');
+    if(delBtn) delBtn.addEventListener('click', ()=> openConfirmDelete(entry.id));
     wireDtField('mdeTime', v=>{ timeVal=v; });
     document.getElementById('mdeDose').addEventListener('input', e=>{ doseVal=e.target.value; });
     document.getElementById('mdeSave').addEventListener('click', save);
