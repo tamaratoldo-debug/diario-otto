@@ -433,6 +433,7 @@ function resizeImageFile(file, maxDim=1600, quality=0.85){
 let entries = store.get('otto:entries', []);
 let foods = store.get('otto:foods', []);
 let meds = store.get('otto:meds', []);
+let skippedSlots = store.get('otto:skipped-slots', []);
 let crecheServicos = store.get('otto:creche-servicos', null);
 if(!crecheServicos){
   crecheServicos = [
@@ -529,6 +530,7 @@ async function loadProfilePhoto(){
 }
 
 function persistEntries(){ return writeStore('otto:entries', entries); }
+function persistSkippedSlots(){ return writeStore('otto:skipped-slots', skippedSlots); }
 function persistFoods(){ return writeStore('otto:foods', foods); }
 function persistMeds(){ return writeStore('otto:meds', meds); }
 function persistCrecheServicos(){ return writeStore('otto:creche-servicos', crecheServicos); }
@@ -612,12 +614,15 @@ function dosesGivenToday(med, horario){ return dosesGivenOnDate(med, horario, to
 // cadastrado, já que agora um remédio pode ter vários horários no dia. Usada
 // tanto pro checklist de hoje quanto pra reconstruir o que era esperado num
 // dia passado (ver pastMedGroupHtml).
+function isSlotSkipped(medId, horario, dateStr){
+  return skippedSlots.some(s=> s.medId===medId && (s.horario||'')===(horario||'') && s.date===dateStr);
+}
 function pendingSlotsForDate(dateStr){
   const active = meds.filter(m=> isMedActiveOnDate(m, dateStr));
   const slots = [];
   for(const m of active){
     const horarios = (m.horarios && m.horarios.length>0) ? m.horarios : [{time:'', dose:m.dose||''}];
-    for(const h of horarios) slots.push({ med:m, horario:h.time, dose:h.dose });
+    for(const h of horarios){ if(!isSlotSkipped(m.id, h.time, dateStr)) slots.push({ med:m, horario:h.time, dose:h.dose }); }
   }
   return slots;
 }
@@ -799,7 +804,7 @@ function openMedDoseEdit(medId, horario, dateStr, entryId){
         <div class="sheet-head">
           <div class="sheet-title" style="color:${CATEGORIES.remedio.hex}">${icon('pill',17,CATEGORIES.remedio.hex)}<span style="color:var(--ink)">Editar dose · ${esc(med.name)}</span></div>
           <div style="display:flex; gap:8px">
-            ${entry?`<button class="icon-btn danger" id="delMedDose">${icon('trash',17,'#A8473A')}</button>`:''}
+            <button class="icon-btn danger" id="delMedDose">${icon('trash',17,'#A8473A')}</button>
             <button class="icon-btn" id="closeMedDose">${icon('x',18)}</button>
           </div>
         </div>
@@ -821,8 +826,10 @@ function openMedDoseEdit(medId, horario, dateStr, entryId){
     document.getElementById('ovMedDose').addEventListener('click', e=>{ if(e.target.id==='ovMedDose') closeModal(); });
     document.getElementById('closeMedDose').addEventListener('click', closeModal);
     document.getElementById('mdeCancel').addEventListener('click', closeModal);
-    const delBtn = document.getElementById('delMedDose');
-    if(delBtn) delBtn.addEventListener('click', ()=> openConfirmDelete(entry.id));
+    document.getElementById('delMedDose').addEventListener('click', ()=>{
+      if(entry) openConfirmDelete(entry.id);
+      else openConfirmSkipSlot(medId, horario, dateStr, med.name);
+    });
     wireDtField('mdeTime', v=>{ timeVal=v; });
     document.getElementById('mdeDose').addEventListener('input', e=>{ doseVal=e.target.value; });
     document.getElementById('mdeSave').addEventListener('click', save);
@@ -2197,6 +2204,28 @@ function openConfirmDelete(id){
     }
     entries = entries.filter(e=>e.id!==id);
     persistEntries();
+    closeModal();
+    renderAll();
+  });
+}
+
+function openConfirmSkipSlot(medId, horario, dateStr, medName){
+  const host = document.getElementById('modalHost');
+  host.innerHTML = `<div class="overlay" id="ovSkip" style="align-items:center">
+    <div style="background:#fff; border-radius:16px; padding:20px; max-width:320px; width:calc(100% - 48px)">
+      <div style="font-size:.9rem; font-weight:600; margin-bottom:4px">Apagar essa dose?</div>
+      <div style="font-size:.75rem; color:var(--ink-muted); margin-bottom:16px">${esc(medName)}${horario?' · '+esc(horario):''} some da lista de ${fmtDateShort(dateStr)}. Não afeta o cadastro nem outros dias.</div>
+      <div style="display:flex; gap:8px">
+        <button class="btn-secondary" id="btnCancelSkip" style="flex:1">Cancelar</button>
+        <button class="btn-danger" id="btnConfirmSkip">Apagar</button>
+      </div>
+    </div>
+  </div>`;
+  document.getElementById('ovSkip').addEventListener('click', e=>{ if(e.target.id==='ovSkip') closeModal(); });
+  document.getElementById('btnCancelSkip').addEventListener('click', closeModal);
+  document.getElementById('btnConfirmSkip').addEventListener('click', ()=>{
+    skippedSlots.push({ medId, horario: horario||'', date: dateStr });
+    persistSkippedSlots();
     closeModal();
     renderAll();
   });
