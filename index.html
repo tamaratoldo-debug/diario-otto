@@ -788,6 +788,28 @@ function toggleMedOnDate(medId, horario, dateStr, explicitTime){
 }
 function toggleMedToday(medId, horario){ toggleMedOnDate(medId, horario, todayStr()); }
 
+// Remédios "sob-demanda" não têm horário fixo pra travar num slot único por
+// dia (diferente de contínuo/pontual, onde cada horário só pode ser dado uma
+// vez). Por isso cada registro aqui é sempre uma dose NOVA, nunca um toggle
+// que desfaz a anterior.
+function logMedDoseNow(medId, dateStr, explicitTime){
+  if(medToggleLock) return;
+  medToggleLock = true;
+  setTimeout(()=>{ medToggleLock = false; }, 500);
+  const med = meds.find(m=>m.id===medId);
+  if(!med) return;
+  const t = dateStr || todayStr();
+  const [y,mo,da] = t.split('-').map(Number);
+  let date = new Date(y, mo-1, da);
+  if(explicitTime){ const [h,m2] = explicitTime.split(':').map(Number); date.setHours(h,m2,0,0); }
+  else if(t===todayStr()){ const now = new Date(); date.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0); }
+  else { date.setHours(12,0,0,0); }
+  entries.push({ id:genId(), category:'remedio', medId:med.id, horarioSlot:'', title:med.name, note:med.dose||'', date:date.toISOString(), createdAt:Date.now() });
+  entries.sort((a,b)=> new Date(b.date)-new Date(a.date));
+  persistEntries();
+  renderAll();
+}
+
 function openMedDoseEdit(medId, horario, dateStr, entryId){
   const host = document.getElementById('modalHost');
   const med = meds.find(m=>m.id===medId);
@@ -1564,7 +1586,7 @@ function openEntryModal(category, editId){
       }));
       document.querySelectorAll('[data-quicklogtime]').forEach(b=> b.addEventListener('click', ()=>{
         const medId = b.dataset.quicklogtime;
-        toggleMedOnDate(medId, '', medQuickDateVal||todayStr(), medQuickTimeVal);
+        logMedDoseNow(medId, medQuickDateVal||todayStr(), medQuickTimeVal);
         medQuickTimePick = null;
         closeModal();
       }));
@@ -1692,7 +1714,7 @@ function openEntryModal(category, editId){
       }));
       document.querySelectorAll('[data-quicklogtime]').forEach(b=> b.addEventListener('click', ()=>{
         const medId = b.dataset.quicklogtime;
-        toggleMedOnDate(medId, '', medQuickDateVal||todayStr(), medQuickTimeVal);
+        logMedDoseNow(medId, medQuickDateVal||todayStr(), medQuickTimeVal);
         medQuickTimePick = null;
         closeModal();
       }));
