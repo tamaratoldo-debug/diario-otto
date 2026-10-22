@@ -3218,6 +3218,7 @@ const Sync = (function(){
         }
         raw.set(L_KEY, String(Date.now()));
         lastError = '';
+        if(pendingCount()===0){ try{ await dailySnapshot(); }catch(e){ console.warn('sync snapshot', e); } }
         return true;
       }catch(e){
         console.warn('sync flush', e); lastError = (e && e.code) || 'erro';
@@ -3248,14 +3249,51 @@ const Sync = (function(){
     await b2.commit();
     photoSizes[id] = data.length; rset(Z_KEY, photoSizes);
   }
+  // Foto apagada no app não sai da nuvem na hora: fica marcada e só é removida
+  // depois de KEEP_DAYS, pra poder voltar junto com uma cópia diária.
   async function deletePhotoCloud(id){
     const metaRef = base().collection('photos').doc(id);
     const m = await metaRef.get();
-    if(!m.exists) return;
+    if(!m.exists || m.data().deletedAt) return;
+    await metaRef.set(Object.assign({}, m.data(), {deletedAt: Date.now()}));
+  }
+  async function purgePhoto(id, n){
     const b = db.batch();
-    for(let j=0;j<(m.data().n||0);j++) b.delete(base().collection('photoChunks').doc(id+'__'+j));
-    b.delete(metaRef);
+    for(let j=0;j<(n||0);j++) b.delete(base().collection('photoChunks').doc(id+'__'+j));
+    b.delete(base().collection('photos').doc(id));
     await b.commit();
+  }
+
+  // ---- cópia completa diária (últimos KEEP_DAYS dias) ----
+  const KEEP_DAYS = 30, SNAP_KEY = 'otto:sync-snapshot-day';
+  async function dailySnapshot(){
+    const day = toLocalDateStr(new Date());
+    if(raw.get(SNAP_KEY)===day) return;
+    const kv = {}; KV.forEach(k=>{ const v = raw.get(k); if(v!==null) kv[k] = v; });
+    const data = JSON.stringify({ day, t:Date.now(), entries: rget('otto:entries', []), creche: rget('otto:creche-lancamentos', []), kv });
+    const n = Math.max(1, Math.ceil(data.length / CHUNK));
+    for(let i=0;i<n;i+=5){
+      const b = db.batch();
+      for(let j=i;j<Math.min(n,i+5);j++) b.set(base().collection('snapshotChunks').doc(day+'__'+j), {b: data.slice(j*CHUNK,(j+1)*CHUNK)});
+      await b.commit();
+    }
+    await base().collection('snapshots').doc(day).set({n, len:data.length, t:Date.now()});
+    raw.set(SNAP_KEY, day);
+    let total = 0;
+    // limpeza: cópias e fotos apagadas com mais de KEEP_DAYS dias
+    const cutoff = Date.now() - KEEP_DAYS*86400000;
+    const snaps = await base().collection('snapshots').get();
+    const old = []; snaps.forEach(d=>{ if((d.data().t||0) < cutoff) old.push([d.id, d.data().n||0]); else total += d.data().len||0; });
+    raw.set('otto:sync-snapshot-bytes', String(total));
+    for(const [id, cnt] of old){
+      const b = db.batch();
+      for(let j=0;j<cnt;j++) b.delete(base().collection('snapshotChunks').doc(id+'__'+j));
+      b.delete(base().collection('snapshots').doc(id));
+      await b.commit();
+    }
+    const ph = await base().collection('photos').get();
+    const gone = []; ph.forEach(d=>{ const x = d.data(); if(x.deletedAt && x.deletedAt < cutoff) gone.push([d.id, x.n||0]); });
+    for(const [id, cnt] of gone) await purgePhoto(id, cnt);
   }
   async function downloadPhoto(id, n){
     let data = '';
@@ -3415,6 +3453,7 @@ const Sync = (function(){
     let n = 0;
     Object.keys(COLL).concat(KV).forEach(k=>{ const v = raw.get(k); if(v) n += v.length; });
     Object.values(photoSizes).forEach(v=> n += v||0);
+    n += +(raw.get('otto:sync-snapshot-bytes')||0);
     return n;
   }
   function fmtMB(b){ const mb = b/1048576; return (mb<10? mb.toFixed(1) : Math.round(mb)).toString().replace('.',',') + ' MB'; }
