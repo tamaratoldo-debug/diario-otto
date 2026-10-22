@@ -582,6 +582,75 @@ function writeStore(key, value){
   store.set(FLAG, true);
 })();
 
+// Recupera, uma única vez por aparelho, registros de 08/10 (após o backup) e
+// 12/10/2026 reconstruídos a partir de prints. Não duplica: pula o que já
+// existir no mesmo dia/horário.
+(function seedPrintsOct2026(){
+  const FLAG = 'otto:seed-prints-2026-10-22';
+  if(store.get(FLAG, false)) return;
+  const norm = t=> (t||'').trim().toLowerCase();
+  const T = s=> new Date(s+':00-03:00');
+  const dayOf = d=> toLocalDateStr(new Date(d));
+  const medByName = n=> meds.find(m=> norm(m.name)===norm(n));
+  let medsChanged = false, entriesChanged = false;
+
+  // Luftal: só o dia que temos certeza
+  if(!medByName('Luftal')){
+    meds.push({ id:'seed-luftal-2026-10-12', name:'Luftal', tipo:'pontual', dataInicio:'2026-10-12', dataFim:'2026-10-12', dose:'',
+      horarios:[{time:'07:30',dose:'0,5 ml'},{time:'19:30',dose:'0,5 ml'}], pausadoDesde:'', encerradoEm:'' });
+    medsChanged = true;
+  }
+
+  // Buscopam da manhã de 08/10: 07:58 -> 08:01 (como no print)
+  const bm = entries.find(e=> e.id==='1791457094800-iqt2ba');
+  if(bm && new Date(bm.date).getTime()===T('2026-10-08T07:58').getTime()){ bm.date = T('2026-10-08T08:01').toISOString(); entriesChanged = true; }
+
+  const DOSES = [
+    ['2026-10-08T18:00','Nuxcell Plus','18:00','1 seringa'],
+    ['2026-10-08T19:30','Gardenal','19:30','0,5 ml'],
+    ['2026-10-08T19:30','Nefron','19:30','5 gts'],
+    ['2026-10-08T19:30','Pregabalina','19:30','1 cáps'],
+    ['2026-10-08T19:30','Vonau','19:30','1 ml'],
+    ['2026-10-08T20:00','CBD','20:00','11 gts'],
+    ['2026-10-08T22:46','Carbovet','','1 comp'],
+    ['2026-10-12T07:30','Gardenal','07:30','0,5 ml'],
+    ['2026-10-12T07:30','Luftal','07:30','0,5 ml'],
+    ['2026-10-12T07:30','Nefron','07:30','5 gts'],
+    ['2026-10-12T07:30','Pregabalina','07:30','1 cáps'],
+    ['2026-10-12T07:30','Vonau','07:30','1 ml'],
+    ['2026-10-12T12:00','Bezafibrato','12:00','1 cáps'],
+    ['2026-10-12T19:10','Buscopam','','1 gt por kg'],
+    ['2026-10-12T19:10','Luftal','19:30','0,5 ml']
+  ];
+  DOSES.forEach(([when,name,slot,dose],i)=>{
+    const med = medByName(name); if(!med) return;
+    const d = T(when), day = dayOf(d);
+    const exists = entries.some(e=> e.category==='remedio' && (e.medId===med.id || norm(e.title)===norm(name)) && dayOf(e.date)===day &&
+      (slot ? (e.horarioSlot===slot) : Math.abs(new Date(e.date)-d) <= 15*60000));
+    if(exists) return;
+    entries.push({ id:'seed-p-dose-'+i, category:'remedio', medId:med.id, horarioSlot:slot, title:med.name, note:dose, date:d.toISOString(), createdAt:Date.now() });
+    entriesChanged = true;
+  });
+
+  const OUTROS = [
+    {when:'2026-10-12T07:29', category:'alimentacao', title:'Frango', note:'Com chá', comoComeu:'tudo_vontade', quantidade:'1/3', noTime:false},
+    {when:'2026-10-12T13:00', category:'alimentacao', title:'Frango', note:'Com chá', comoComeu:'tudo_vontade', quantidade:'1/3', noTime:false},
+    {when:'2026-10-12T18:35', category:'intercorrencia', title:'Vômito', note:'', gravidade:'', noTime:false}
+  ];
+  OUTROS.forEach((o,i)=>{
+    const d = T(o.when);
+    const exists = entries.some(e=> e.category===o.category && norm(e.title)===norm(o.title) && Math.abs(new Date(e.date)-d) <= 15*60000);
+    if(exists) return;
+    const {when, ...rest} = o;
+    entries.push(Object.assign({ id:'seed-p-outro-'+i, date:d.toISOString(), createdAt:Date.now() }, rest));
+    entriesChanged = true;
+  });
+
+  if(medsChanged) store.set('otto:meds', meds);
+  if(entriesChanged) store.set('otto:entries', entries);
+  store.set(FLAG, true);
+})();
+
 // ---------- render: hero / peso ----------
 function ageText(){
   if(!settings.birthdate) return '';
