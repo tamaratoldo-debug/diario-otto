@@ -377,12 +377,12 @@ function idbOpen(){
     req.onerror = ()=> reject(req.error);
   });
 }
-async function idbPutPhoto(id, blob){
+async function idbPutPhoto(id, blob, fromCloud){
   const db = await idbOpen();
   return new Promise((resolve, reject)=>{
     const tx = db.transaction('photos','readwrite');
     tx.objectStore('photos').put(blob, id);
-    tx.oncomplete = ()=> resolve(true);
+    tx.oncomplete = ()=>{ if(!fromCloud && window.__ottoSync) window.__ottoSync.onPhotoPut(id); resolve(true); };
     tx.onerror = ()=> reject(tx.error);
   });
 }
@@ -400,7 +400,7 @@ async function idbDeletePhoto(id){
   return new Promise((resolve, reject)=>{
     const tx = db.transaction('photos','readwrite');
     tx.objectStore('photos').delete(id);
-    tx.oncomplete = ()=> resolve(true);
+    tx.oncomplete = ()=>{ if(window.__ottoSync) window.__ottoSync.onPhotoDel(id); resolve(true); };
     tx.onerror = ()=> reject(tx.error);
   });
 }
@@ -566,6 +566,7 @@ function writeStore(key, value){
 (function seedCrecheOct2026(){
   const FLAG = 'otto:seed-creche-2026-10-22';
   if(store.get(FLAG, false)) return;
+  if(!entries.length){ store.set(FLAG, true); return; }  // aparelho vazio: os dados vêm da nuvem
   const SEED = [{"id":"seed-202606-00","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-06-01","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-01","servicoId":"banho","servicoNome":"Banho","valor":90,"data":"2026-06-01","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-02","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-06-02","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-03","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-06-03","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-04","servicoId":"outro","servicoNome":"Exames (hemograma, creatinina, uréia)","valor":110,"data":"2026-06-03","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-05","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-06-05","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-06","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-06-08","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-07","servicoId":"outro","servicoNome":"Soro + medicação","valor":160,"data":"2026-06-08","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-08","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-06-09","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-09","servicoId":"outro","servicoNome":"Soro + Medicação","valor":160,"data":"2026-06-09","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-10","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-06-10","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-11","servicoId":"outro","servicoNome":"Soro + Medicação","valor":160,"data":"2026-06-10","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-12","servicoId":"hotel","servicoNome":"Hotel","valor":70,"data":"2026-06-13","dataSaida":"2026-06-14","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-13","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-06-16","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-14","servicoId":"banho","servicoNome":"Banho","valor":90,"data":"2026-06-16","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-15","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-06-17","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-16","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-06-19","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-17","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-06-26","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202606-18","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-06-29","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-00","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-07-01","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-01","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-07-03","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-02","servicoId":"banho","servicoNome":"Banho","valor":90,"data":"2026-07-03","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-03","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-07-07","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-04","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-07-08","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-05","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-07-10","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-06","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-07-14","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-07","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-07-15","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-08","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-07-17","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-09","servicoId":"outro","servicoNome":"Medicação (metronidazol, cerênia e buscopam)","valor":130,"data":"2026-07-17","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-10","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-07-20","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-11","servicoId":"banho","servicoNome":"Banho","valor":90,"data":"2026-07-20","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-12","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-07-21","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-13","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-07-22","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-14","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-07-28","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-15","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-07-29","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"seed-202607-16","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-07-31","dataSaida":"","obs":"","entryId":null,"createdAt":0},{"id":"1787228399992-ix0uzd","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-08-04","dataSaida":"","obs":"","entryId":"1787228399992-2duly3","createdAt":0},{"id":"1787228416356-yten0e","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-08-05","dataSaida":"","obs":"","entryId":"1787228416356-jlcex7","createdAt":0},{"id":"1787228431746-wurp8a","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-08-06","dataSaida":"","obs":"","entryId":"1787228431746-vb49op","createdAt":0},{"id":"1787228438097-h86ecc","servicoId":"banho","servicoNome":"Banho","valor":90,"data":"2026-08-06","dataSaida":"","obs":"","entryId":"1787228438097-vxfv04","createdAt":0},{"id":"1787228446615-g6xq6w","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-08-12","dataSaida":"","obs":"","entryId":"1787228446615-chsxe1","createdAt":0},{"id":"1787230464080-or8efm","servicoId":"outro","servicoNome":"Cerênia","valor":80,"data":"2026-08-12","dataSaida":"","obs":"Candi Krul","entryId":null,"createdAt":0,"procedimentoEntryId":"1787230464079-024rj5"},{"id":"1787228486857-6tj1r5","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-08-14","dataSaida":"","obs":"","entryId":"1787228486857-d6a5re","createdAt":0},{"id":"1787234423123-j62i0k","servicoId":"outro","servicoNome":"Exame de sangue","valor":84,"data":"2026-08-14","dataSaida":"","obs":"Candi Krul","entryId":null,"createdAt":0,"procedimentoEntryId":"1787234423121-r13esu"},{"id":"1787228515516-9yj08b","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-08-18","dataSaida":"","obs":"","entryId":"1787228515516-ct5xnq","createdAt":0},{"id":"1787228521365-beomqx","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-08-19","dataSaida":"","obs":"","entryId":"1787228521365-9fs2b7","createdAt":0},{"id":"1787331382928-pje6bf","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-08-21","dataSaida":"","obs":"","entryId":"1787331382928-z59cad","createdAt":0},{"id":"1787690477596-zok7zo","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-08-25","dataSaida":"","obs":"","entryId":"1787690477596-7ivx38","createdAt":0},{"id":"1787690481362-6c1npy","servicoId":"banho","servicoNome":"Banho","valor":90,"data":"2026-08-25","dataSaida":"","obs":"","entryId":"1787690481362-3hcvct","createdAt":0},{"id":"1787741602698-se94k1","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-08-26","dataSaida":"","obs":"","entryId":"1787741602698-5avfp1","createdAt":0},{"id":"1787945726616-8wu4pw","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-08-28","dataSaida":"","obs":"","entryId":"1787945726616-9747aq","createdAt":0},{"id":"1787945768501-gycroa","servicoId":"outro","servicoNome":"Tosa","valor":30,"data":"2026-08-28","dataSaida":"","obs":"","entryId":"1787945768501-ylsfb0","createdAt":0},{"id":"1788388513119-zaer9f","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-09-02","dataSaida":"","obs":"","entryId":"1788388513119-egwtka","createdAt":0},{"id":"1788647189057-24r802","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-09-05","dataSaida":"","obs":"","entryId":"1788647189057-vurmfk","createdAt":0},{"id":"1788953991713-y9b5su","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-09-09","dataSaida":"","obs":"","entryId":"1788953991713-bikclt","createdAt":0},{"id":"1789130320029-5kk0ri","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-09-11","dataSaida":"","obs":"","entryId":"1789130320029-2zbdk6","createdAt":0},{"id":"1789218095043-dw0zoy","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-09-12","dataSaida":"","obs":"","entryId":"1789218095043-i3cdgk","createdAt":0},{"id":"1789503186951-yodlrx","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-09-15","dataSaida":"","obs":"","entryId":"1789503186951-y3u2g6","createdAt":0},{"id":"1789559806978-qdvqzb","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-09-16","dataSaida":"","obs":"","entryId":"1789559806978-q3jpt4","createdAt":0},{"id":"1789784445674-63e5ip","servicoId":"hotel","servicoNome":"Hotel","valor":70,"data":"2026-09-18","dataSaida":"2026-09-19","obs":"","entryId":"1789784445674-z1kt8x","createdAt":0},{"id":"1790019849985-uatjqz","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-09-21","dataSaida":"","obs":"","entryId":"1790019849985-2ovdt7","createdAt":0},{"id":"1790165170026-961nxm","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-09-23","dataSaida":"","obs":"","entryId":"1790165170026-2pyju4","createdAt":0},{"id":"1790366733787-ajeqyf","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-09-25","dataSaida":"","obs":"","entryId":"1790366733787-rzajeu","createdAt":0},{"id":"1790764660627-v12kw9","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-09-30","dataSaida":"","obs":"","entryId":"1790764660627-8kdoun","createdAt":0},{"id":"1790947930743-ip5ww9","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-10-02","dataSaida":"","obs":"","entryId":"1790947930743-crlipo","createdAt":0},{"id":"1791371146053-aae25m","servicoId":"creche","servicoNome":"Creche","valor":30,"data":"2026-10-07","dataSaida":"","obs":"","entryId":"1791371146053-xxzawh","createdAt":0}];
   const norm = t=> (t||'').trim().toLowerCase();
   const now = Date.now();
@@ -588,6 +589,7 @@ function writeStore(key, value){
 (function seedPrintsOct2026(){
   const FLAG = 'otto:seed-prints-2026-10-22';
   if(store.get(FLAG, false)) return;
+  if(!entries.length){ store.set(FLAG, true); return; }  // aparelho vazio: os dados vêm da nuvem
   const norm = t=> (t||'').trim().toLowerCase();
   const T = s=> new Date(s+':00-03:00');
   const dayOf = d=> toLocalDateStr(new Date(d));
@@ -2584,12 +2586,14 @@ function openSettings(){
             <button type="button" id="importBtn" class="btn-secondary" style="flex:1; font-size:.82rem; padding:11px 8px">Restaurar backup</button>
             <input type="file" id="importFileInput" accept="application/json" style="display:none"/>
           </div>
-          <div class="hint" style="text-align:center; margin-top:14px" id="appVersionText">Versão: ${APP_VERSION}</div>
+          <div class="hint" style="text-align:center; margin-top:14px; line-height:1.5" id="syncStatusText"></div>
+          <div class="hint" style="text-align:center; margin-top:6px" id="appVersionText">Versão: ${APP_VERSION}</div>
         </div>
         <div class="sheet-foot"><button class="btn-primary" id="saveSet" ${saving?'disabled':''}>${saving?'Salvando...':'Salvar'}</button></div>
       </div>
     </div>`;
     loadAppVersion();
+    Sync.renderStatus();
     const racaEl = document.getElementById('racaInput'); racaEl.addEventListener('input', e=> draftRaca=e.target.value);
     const sexoEl = document.getElementById('sexoInput'); sexoEl.addEventListener('change', e=> draftSexo=e.target.value);
     wireDtField('birthdateInput', v=> draftBirthdate=v);
@@ -3083,11 +3087,386 @@ document.getElementById('searchCloseBtn').addEventListener('click', ()=>{
   search=''; document.getElementById('searchInput').value=''; renderTimeline();
 });
 
+
+// ---------- nuvem (Firebase): login + sincronização ----------
+// O celular continua guardando tudo localmente (localStorage + IndexedDB). Este
+// módulo espelha cada alteração no Firestore da conta da Tamara e, ao abrir,
+// traz da nuvem o que estiver faltando. Regras de merge:
+//  - registros (entries, creche): a nuvem é a referência, mas alterações locais
+//    ainda não enviadas ("pendentes") vencem, e registros locais que nunca
+//    chegaram à nuvem são enviados (nunca apagados);
+//  - configurações/listas (kv): pendente local vence; senão vale a nuvem;
+//  - fotos: baixa as que faltam no aparelho, envia as que faltam na nuvem.
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDGoCwkbYlaOtnxwoQ4BG8vwNBeP3rIUDk",
+  authDomain: "diario-otto-a8fa0.firebaseapp.com",
+  projectId: "diario-otto-a8fa0",
+  storageBucket: "diario-otto-a8fa0.firebasestorage.app",
+  messagingSenderId: "774795367051",
+  appId: "1:774795367051:web:8d9c03145d43e5668efa8e"
+};
+const FIREBASE_SDK = [
+  'https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js',
+  'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js',
+  'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js'
+];
+
+const Sync = (function(){
+  const COLL = { 'otto:entries':'entries', 'otto:creche-lancamentos':'creche' };
+  const KV = ['otto:foods','otto:meds','otto:settings','otto:creche-servicos','otto:creche-fechados','otto:skipped-slots',
+    'otto:intercorrencia-chips','otto:consulta-chips','otto:clinica-chips','otto:procedimento-chips',
+    'otto:quantidade-chips','otto:profissional-chips','otto:observacao-chips'];
+  const P_KEY = 'otto:sync-pending', S_KEY = 'otto:sync-synced', L_KEY = 'otto:sync-last', Z_KEY = 'otto:sync-photo-sizes';
+  const CHUNK = 900000;      // caracteres por pedaço de foto (doc do Firestore tem limite de 1 MiB)
+  const BATCH = 400;         // operações por lote (limite do Firestore é 500)
+
+  const raw = { get: k=> localStorage.getItem(k), set: (k,v)=>{ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } } };
+  const rget = (k,fb)=>{ try{ const v = raw.get(k); return v===null? fb : JSON.parse(v); }catch(e){ return fb; } };
+  const rset = (k,v)=> raw.set(k, JSON.stringify(v));
+
+  let pending = rget(P_KEY, null) || {};
+  pending.c = pending.c || {}; pending.kv = pending.kv || {}; pending.ph = pending.ph || {};
+  Object.values(COLL).forEach(c=>{ pending.c[c] = pending.c[c] || {}; });
+  let synced = rget(S_KEY, null) || {};               // ids que já estiveram na nuvem, por coleção
+  Object.values(COLL).forEach(c=>{ synced[c] = synced[c] || []; });
+  let photoSizes = rget(Z_KEY, {}) || {};
+  let seq = Date.now();
+  let shadow = {};                                     // coleção -> Map(id -> json) do último estado conhecido
+  let tracking = false, db = null, auth = null, user = null;
+  let flushing = null, flushQueued = false, timer = null, sdkState = 'loading', lastError = '';
+
+  function savePending(){ rset(P_KEY, pending); }
+  function saveSynced(){ rset(S_KEY, synced); }
+  function pendingCount(){
+    let n = Object.keys(pending.kv).length + Object.keys(pending.ph).length;
+    Object.values(pending.c).forEach(m=> n += Object.keys(m).length);
+    return n;
+  }
+  function buildShadow(key){
+    const m = new Map();
+    (rget(key, []) || []).forEach(it=>{ if(it && it.id) m.set(it.id, JSON.stringify(it)); });
+    shadow[COLL[key]] = m;
+  }
+
+  // ---- rastreamento de alterações locais ----
+  function onSet(key){
+    if(!tracking) return;
+    if(COLL[key]){
+      const c = COLL[key], old = shadow[c] || new Map(), now = new Map();
+      (rget(key, []) || []).forEach(it=>{
+        if(!it || !it.id) return;
+        const s = JSON.stringify(it); now.set(it.id, s);
+        if(old.get(it.id)!==s) pending.c[c][it.id] = {op:'up', s:++seq};
+      });
+      old.forEach((_,id)=>{ if(!now.has(id)) pending.c[c][id] = {op:'del', s:++seq}; });
+      shadow[c] = now;
+    } else if(KV.includes(key)){
+      pending.kv[key] = ++seq;
+    } else return;
+    savePending(); schedule();
+  }
+  function onPhotoPut(id){ if(!tracking || !id) return; pending.ph[id] = {op:'up', s:++seq}; savePending(); schedule(); }
+  function onPhotoDel(id){ if(!tracking || !id) return; pending.ph[id] = {op:'del', s:++seq}; delete photoSizes[id]; rset(Z_KEY, photoSizes); savePending(); schedule(); }
+
+  function schedule(ms){ clearTimeout(timer); timer = setTimeout(()=>{ flush(); }, ms==null? 800 : ms); }
+
+  // ---- envio para a nuvem ----
+  function base(){ return db.collection('users').doc(user.uid); }
+  async function commitOps(ops){
+    for(let i=0;i<ops.length;i+=BATCH){
+      const b = db.batch();
+      ops.slice(i,i+BATCH).forEach(o=>{ if(o.del) b.delete(o.ref); else b.set(o.ref, o.data); });
+      await b.commit();
+    }
+  }
+  function flush(){
+    if(!db || !user) return Promise.resolve(false);
+    if(flushing){ flushQueued = true; return flushing; }
+    flushing = (async ()=>{
+      try{
+        const t = Date.now();
+        // registros
+        for(const key in COLL){
+          const c = COLL[key], snap = Object.assign({}, pending.c[c]);
+          const ids = Object.keys(snap); if(!ids.length) continue;
+          const local = new Map((rget(key, []) || []).filter(x=>x && x.id).map(x=>[x.id, x]));
+          const ops = ids.map(id=>{
+            const ref = base().collection(c).doc(id);
+            const it = local.get(id);
+            return (snap[id].op==='del' || !it) ? {ref, del:true, id} : {ref, data:{d:JSON.stringify(it), t}, id};
+          });
+          await commitOps(ops);
+          const set = new Set(synced[c]);
+          ops.forEach(o=>{ if(o.del) set.delete(o.id); else set.add(o.id); if(pending.c[c][o.id] && pending.c[c][o.id].s===snap[o.id].s) delete pending.c[c][o.id]; });
+          synced[c] = [...set]; saveSynced(); savePending();
+        }
+        // configurações e listas
+        const kvSnap = Object.assign({}, pending.kv), kvKeys = Object.keys(kvSnap);
+        if(kvKeys.length){
+          await commitOps(kvKeys.map(k=>{
+            const ref = base().collection('kv').doc(k), v = raw.get(k);
+            return v===null ? {ref, del:true} : {ref, data:{v, t}};
+          }));
+          kvKeys.forEach(k=>{ if(pending.kv[k]===kvSnap[k]) delete pending.kv[k]; });
+          savePending();
+        }
+        // fotos
+        for(const id of Object.keys(pending.ph)){
+          const p = pending.ph[id];
+          if(p.op==='up') await uploadPhoto(id); else await deletePhotoCloud(id);
+          if(pending.ph[id] && pending.ph[id].s===p.s){ delete pending.ph[id]; savePending(); }
+        }
+        raw.set(L_KEY, String(Date.now()));
+        lastError = '';
+        return true;
+      }catch(e){
+        console.warn('sync flush', e); lastError = (e && e.code) || 'erro';
+        return false;
+      }finally{
+        flushing = null; renderStatus();
+        if(flushQueued){ flushQueued = false; schedule(300); }
+      }
+    })();
+    return flushing;
+  }
+  async function uploadPhoto(id){
+    const blob = await idbGetPhoto(id);
+    if(!blob){ return deletePhotoCloud(id); }
+    const data = await blobToDataUrl(blob);
+    const n = Math.max(1, Math.ceil(data.length / CHUNK));
+    const metaRef = base().collection('photos').doc(id);
+    const old = await metaRef.get();
+    const oldN = old.exists ? (old.data().n || 0) : 0;
+    for(let i=0;i<n;i+=5){
+      const b = db.batch();
+      for(let j=i;j<Math.min(n,i+5);j++) b.set(base().collection('photoChunks').doc(id+'__'+j), {b: data.slice(j*CHUNK,(j+1)*CHUNK)});
+      await b.commit();
+    }
+    const b2 = db.batch();
+    for(let j=n;j<oldN;j++) b2.delete(base().collection('photoChunks').doc(id+'__'+j));
+    b2.set(metaRef, {n, len:data.length, t:Date.now()});
+    await b2.commit();
+    photoSizes[id] = data.length; rset(Z_KEY, photoSizes);
+  }
+  async function deletePhotoCloud(id){
+    const metaRef = base().collection('photos').doc(id);
+    const m = await metaRef.get();
+    if(!m.exists) return;
+    const b = db.batch();
+    for(let j=0;j<(m.data().n||0);j++) b.delete(base().collection('photoChunks').doc(id+'__'+j));
+    b.delete(metaRef);
+    await b.commit();
+  }
+  async function downloadPhoto(id, n){
+    let data = '';
+    for(let j=0;j<n;j++){
+      const d = await base().collection('photoChunks').doc(id+'__'+j).get();
+      if(!d.exists) return false;
+      data += d.data().b;
+    }
+    const blob = await (await fetch(data)).blob();
+    await idbPutPhoto(id, blob, true);
+    photoSizes[id] = data.length; rset(Z_KEY, photoSizes);
+    return true;
+  }
+  function referencedPhotoIds(){
+    const ids = new Set();
+    (rget('otto:entries', []) || []).forEach(e=>{
+      if(!e) return;
+      if(e.photoId) ids.add(e.photoId);
+      (e.photoIds||[]).forEach(x=> ids.add(x));
+      if(e.anexoId) ids.add(e.anexoId);
+      (e.anexos||[]).forEach(a=> a && a.id && ids.add(a.id));
+    });
+    const st = rget('otto:settings', {}) || {};
+    if(st.profilePhotoId) ids.add(st.profilePhotoId);
+    return [...ids];
+  }
+
+  // ---- primeira subida e leitura da nuvem ----
+  async function firstUpload(){
+    const entriesLocal = rget('otto:entries', []) || [];
+    if(!entriesLocal.length) return;   // aparelho vazio não inicializa a nuvem
+    for(const key in COLL){
+      (rget(key, []) || []).forEach(it=>{ if(it && it.id) pending.c[COLL[key]][it.id] = {op:'up', s:++seq}; });
+    }
+    KV.forEach(k=>{ if(raw.get(k)!==null) pending.kv[k] = ++seq; });
+    for(const id of referencedPhotoIds()){
+      try{ if(await idbGetPhoto(id)) pending.ph[id] = {op:'up', s:++seq}; }catch(e){}
+    }
+    savePending();
+    const ok = await flush();
+    if(ok && pendingCount()===0) await base().collection('kv').doc('__meta').set({createdAt: Date.now()});
+  }
+
+  async function pull(){
+    const meta = await base().collection('kv').doc('__meta').get();
+    if(!meta.exists){ await firstUpload(); renderStatus(); return; }
+    const [eSnap, cSnap, kvSnap, phSnap] = await Promise.all(
+      ['entries','creche','kv','photos'].map(n=> base().collection(n).get()));
+    const snaps = {entries:eSnap, creche:cSnap};
+    let changed = false;
+
+    for(const key in COLL){
+      const c = COLL[key];
+      const cloud = new Map(); snaps[c].forEach(d=> cloud.set(d.id, d.data().d));
+      const localArr = (rget(key, []) || []).filter(x=>x && x.id);
+      const local = new Map(localArr.map(x=>[x.id, JSON.stringify(x)]));
+      const wasSynced = new Set(synced[c]);
+      const result = new Map(cloud);
+      local.forEach((s,id)=>{
+        const p = pending.c[c][id];
+        if(p && p.op==='up') result.set(id, s);
+        else if(!cloud.has(id) && !wasSynced.has(id)){ result.set(id, s); pending.c[c][id] = {op:'up', s:++seq}; }
+      });
+      Object.keys(pending.c[c]).forEach(id=>{ if(pending.c[c][id].op==='del') result.delete(id); });
+      const same = result.size===local.size && [...result].every(([id,s])=> local.get(id)===s);
+      if(!same){
+        const order = localArr.map(x=>x.id).filter(id=> result.has(id));
+        const seen = new Set(order);
+        result.forEach((_,id)=>{ if(!seen.has(id)) order.push(id); });
+        rset(key, order.map(id=> JSON.parse(result.get(id))));
+        changed = true;
+      }
+      synced[c] = [...cloud.keys()];
+      buildShadow(key);
+    }
+    saveSynced();
+
+    const kvCloud = new Map(); kvSnap.forEach(d=>{ if(d.id!=='__meta') kvCloud.set(d.id, d.data().v); });
+    KV.forEach(k=>{
+      if(pending.kv[k]) return;
+      const cv = kvCloud.get(k), lv = raw.get(k);
+      if(cv!=null && cv!==lv){ raw.set(k, cv); changed = true; }
+      else if(cv==null && lv!==null){ pending.kv[k] = ++seq; }
+    });
+    savePending();
+
+    if(changed){
+      // Recarrega na hora (sem dar chance de um clique gravar o estado antigo da tela).
+      let n = 0; try{ n = +(sessionStorage.getItem('otto:sync-reloads')||0); }catch(e){}
+      if(n < 2){ try{ sessionStorage.setItem('otto:sync-reloads', String(n+1)); }catch(e){} location.reload(); return; }
+    }
+
+    const cloudPh = new Map(); phSnap.forEach(d=> cloudPh.set(d.id, d.data().n||0));
+    let downloaded = 0;
+    for(const id of referencedPhotoIds()){
+      let localBlob = null; try{ localBlob = await idbGetPhoto(id); }catch(e){}
+      if(!localBlob && cloudPh.has(id)){ try{ if(await downloadPhoto(id, cloudPh.get(id))) downloaded++; }catch(e){ console.warn('foto', id, e); } }
+      else if(localBlob && !cloudPh.has(id) && !pending.ph[id]){ pending.ph[id] = {op:'up', s:++seq}; }
+    }
+    savePending();
+    if(downloaded){ try{ renderAll(); loadProfilePhoto(); }catch(e){} }
+    await flush();
+  }
+
+  // ---- tela de login ----
+  function showLogin(msg){
+    let el = document.getElementById('loginHost');
+    if(!el){ el = document.createElement('div'); el.id = 'loginHost'; document.body.appendChild(el); }
+    el.innerHTML = `<div class="overlay" style="z-index:10000; align-items:center">
+      <div class="sheet" style="max-width:420px; margin:0 16px; border-radius:20px">
+        <div class="sheet-head"><div class="sheet-title">Entrar</div></div>
+        <div class="sheet-body">
+          <div class="field"><label>E-mail</label><input id="loginEmail" type="email" autocomplete="username" autocapitalize="off" style="font-size:16px"/></div>
+          <div class="field"><label>Senha</label><input id="loginPass" type="password" autocomplete="current-password" style="font-size:16px"/></div>
+          <div class="hint" id="loginMsg" style="min-height:1.2em; color:${msg && msg.ok?'var(--c-remedio)':'#B3261E'}">${msg? esc(msg.text) : ''}</div>
+          <button type="button" id="loginForgot" class="hint" style="background:none; border:0; padding:6px 0; text-decoration:underline; cursor:pointer">Esqueci minha senha</button>
+        </div>
+        <div class="sheet-foot"><button class="btn-primary" id="loginBtn">Entrar</button></div>
+      </div>
+    </div>`;
+    const email = document.getElementById('loginEmail'), pass = document.getElementById('loginPass');
+    const btn = document.getElementById('loginBtn'), msgEl = document.getElementById('loginMsg');
+    const lastEmail = raw.get('otto:sync-email'); if(lastEmail) email.value = lastEmail;
+    const go = async ()=>{
+      const e = email.value.trim(), p = pass.value;
+      if(!e || !p){ msgEl.style.color='#B3261E'; msgEl.textContent = 'Preencha e-mail e senha.'; return; }
+      btn.disabled = true; btn.textContent = 'Entrando...';
+      try{ await auth.signInWithEmailAndPassword(e, p); raw.set('otto:sync-email', e); }
+      catch(err){ btn.disabled = false; btn.textContent = 'Entrar'; msgEl.style.color='#B3261E'; msgEl.textContent = authMsg(err); }
+    };
+    btn.addEventListener('click', go);
+    pass.addEventListener('keydown', ev=>{ if(ev.key==='Enter') go(); });
+    document.getElementById('loginForgot').addEventListener('click', async ()=>{
+      const e = email.value.trim();
+      if(!e){ msgEl.style.color='#B3261E'; msgEl.textContent = 'Digite seu e-mail acima.'; return; }
+      try{ await auth.sendPasswordResetEmail(e); msgEl.style.color='var(--c-remedio)'; msgEl.textContent = 'Enviamos um link para redefinir a senha.'; }
+      catch(err){ msgEl.style.color='#B3261E'; msgEl.textContent = authMsg(err); }
+    });
+  }
+  function hideLogin(){ const el = document.getElementById('loginHost'); if(el) el.remove(); }
+  function authMsg(err){
+    const c = (err && err.code) || '';
+    if(c.includes('invalid-credential') || c.includes('wrong-password') || c.includes('user-not-found') || c.includes('invalid-email')) return 'E-mail ou senha incorretos.';
+    if(c.includes('too-many-requests')) return 'Muitas tentativas. Espere alguns minutos e tente de novo.';
+    if(c.includes('network')) return 'Sem conexão com a internet.';
+    return 'Não consegui entrar. Tente de novo.';
+  }
+
+  // ---- indicador em Configurações ----
+  function fmtWhen(ms){
+    const d = new Date(ms), now = new Date();
+    const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    if(d.toDateString()===now.toDateString()) return 'hoje, ' + hm;
+    return `${pad(d.getDate())}/${pad(d.getMonth()+1)}, ${hm}`;
+  }
+  function usedBytes(){
+    let n = 0;
+    Object.keys(COLL).concat(KV).forEach(k=>{ const v = raw.get(k); if(v) n += v.length; });
+    Object.values(photoSizes).forEach(v=> n += v||0);
+    return n;
+  }
+  function fmtMB(b){ const mb = b/1048576; return (mb<10? mb.toFixed(1) : Math.round(mb)).toString().replace('.',',') + ' MB'; }
+  function statusText(){
+    if(sdkState==='failed') return 'Nuvem: sem conexão no momento';
+    if(!user) return 'Nuvem: desconectada';
+    const n = pendingCount(), last = +(raw.get(L_KEY)||0);
+    let line = n ? `Nuvem: ${n} ${n===1?'alteração aguardando':'alterações aguardando'} envio`
+                 : (last ? `Nuvem: sincronizado ${fmtWhen(last)}` : 'Nuvem: sincronizando...');
+    if(n && lastError && lastError.includes('unavailable')) line += ' (sem internet)';
+    return line + `<br>Espaço usado: ${fmtMB(usedBytes())} de 1 GB`;
+  }
+  function renderStatus(){ const el = document.getElementById('syncStatusText'); if(el) el.innerHTML = statusText(); }
+
+  // ---- inicialização ----
+  function loadScript(src){
+    return new Promise((res, rej)=>{ const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+  }
+  async function start(){
+    // A partir daqui, toda gravação local passa a ser rastreada (o que rodou antes,
+    // como migrações e reposições automáticas, não conta como alteração do usuário).
+    const _set = store.set.bind(store);
+    store.set = function(k, v){ const ok = _set(k, v); if(ok) onSet(k); return ok; };
+    for(const key in COLL) buildShadow(key);
+    tracking = true;
+    window.__ottoSync = { onPhotoPut, onPhotoDel };
+    window.addEventListener('online', ()=> schedule(500));
+    document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') schedule(500); });
+    setTimeout(()=>{ try{ sessionStorage.removeItem('otto:sync-reloads'); }catch(e){} }, 15000);
+    try{
+      if(!window.firebase) for(const src of FIREBASE_SDK) await loadScript(src);
+      firebase.initializeApp(FIREBASE_CONFIG);
+      auth = firebase.auth(); db = firebase.firestore();
+      sdkState = 'ready';
+    }catch(e){ sdkState = 'failed'; renderStatus(); return; }
+    auth.onAuthStateChanged(async u=>{
+      user = u || null;
+      if(!user){ showLogin(); renderStatus(); return; }
+      hideLogin(); renderStatus();
+      try{ await pull(); }catch(e){ console.warn('sync pull', e); lastError = (e && e.code) || 'erro'; await flush(); }
+      renderStatus();
+    });
+  }
+  return { start, renderStatus, flush, _debug: ()=>({pending, synced, shadow}) };
+})();
+
 renderQuickActions();
 renderFilters();
 renderAll();
 loadProfilePhoto();
 checkBackupBanner();
+Sync.start();
 </script>
 </body>
 </html>
