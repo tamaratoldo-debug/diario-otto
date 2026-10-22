@@ -545,6 +545,20 @@ function writeStore(key, value){
   return ok;
 }
 
+// Repõe, uma única vez por aparelho, sugestões de chip perdidas na importação
+// do backup de 08/10 (o import antigo não restaurava profissional/observacao).
+(function seedLostChipsOct2026(){
+  const FLAG = 'otto:seed-lost-chips-2026-10-22';
+  if(store.get(FLAG, false)) return;
+  const adds = { profissional:['Candi Krul'], observacao:['Com chá','Com gengibre em pó e chá'] };
+  for(const k in adds){
+    let changed = false;
+    adds[k].forEach(v=>{ if(!chips[k].includes(v)){ chips[k].push(v); changed = true; } });
+    if(changed) store.set('otto:'+k+'-chips', chips[k]);
+  }
+  store.set(FLAG, true);
+})();
+
 // ---------- render: hero / peso ----------
 function ageText(){
   if(!settings.birthdate) return '';
@@ -1187,7 +1201,7 @@ async function exportBackup(silent){
         if(blob) photos[id] = await blobToDataUrl(blob);
       }catch(e){ console.error('Erro exportando foto', id, e); }
     }
-    const data = { app:'diario-otto', version:1, exportedAt:new Date().toISOString(), entries, foods, meds, chips, settings, photos };
+    const data = { app:'diario-otto', version:1, exportedAt:new Date().toISOString(), entries, foods, meds, chips, settings, photos, crecheLancamentos, skippedSlots };
     const blob = new Blob([JSON.stringify(data)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1251,8 +1265,12 @@ async function importBackup(file){
       consulta: (data.chips && data.chips.consulta) || [],
       clinica: (data.chips && data.chips.clinica) || [],
       procedimento: (data.chips && data.chips.procedimento) || [],
-      quantidade: (data.chips && data.chips.quantidade) || []
+      quantidade: (data.chips && data.chips.quantidade) || [],
+      profissional: (data.chips && data.chips.profissional) || [],
+      observacao: (data.chips && data.chips.observacao) || []
     };
+    if(Array.isArray(data.crecheLancamentos)) crecheLancamentos = data.crecheLancamentos;
+    if(Array.isArray(data.skippedSlots)) skippedSlots = data.skippedSlots;
     settings = data.settings || {sheetLink:''};
 
     writeStore('otto:entries', entries);
@@ -1263,6 +1281,10 @@ async function importBackup(file){
     writeStore('otto:clinica-chips', chips.clinica);
     writeStore('otto:procedimento-chips', chips.procedimento);
     writeStore('otto:quantidade-chips', chips.quantidade);
+    writeStore('otto:profissional-chips', chips.profissional);
+    writeStore('otto:observacao-chips', chips.observacao);
+    if(Array.isArray(data.crecheLancamentos)) writeStore('otto:creche-lancamentos', crecheLancamentos);
+    if(Array.isArray(data.skippedSlots)) writeStore('otto:skipped-slots', skippedSlots);
     writeStore('otto:settings', settings);
 
     if(data.photos){
