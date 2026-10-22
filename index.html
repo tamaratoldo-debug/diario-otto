@@ -1201,7 +1201,7 @@ async function exportBackup(silent){
         if(blob) photos[id] = await blobToDataUrl(blob);
       }catch(e){ console.error('Erro exportando foto', id, e); }
     }
-    const data = { app:'diario-otto', version:1, exportedAt:new Date().toISOString(), entries, foods, meds, chips, settings, photos, crecheLancamentos, skippedSlots };
+    const data = { app:'diario-otto', version:1, exportedAt:new Date().toISOString(), entries, foods, meds, chips, settings, photos, crecheLancamentos, crecheServicos, crecheFechados, skippedSlots };
     const blob = new Blob([JSON.stringify(data)], {type:'application/json'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1271,6 +1271,8 @@ async function importBackup(file){
     };
     if(Array.isArray(data.crecheLancamentos)) crecheLancamentos = data.crecheLancamentos;
     if(Array.isArray(data.skippedSlots)) skippedSlots = data.skippedSlots;
+    if(Array.isArray(data.crecheServicos) && data.crecheServicos.length) crecheServicos = data.crecheServicos;
+    if(data.crecheFechados && typeof data.crecheFechados==='object') crecheFechados = data.crecheFechados;
     settings = data.settings || {sheetLink:''};
 
     writeStore('otto:entries', entries);
@@ -1285,6 +1287,8 @@ async function importBackup(file){
     writeStore('otto:observacao-chips', chips.observacao);
     if(Array.isArray(data.crecheLancamentos)) writeStore('otto:creche-lancamentos', crecheLancamentos);
     if(Array.isArray(data.skippedSlots)) writeStore('otto:skipped-slots', skippedSlots);
+    if(Array.isArray(data.crecheServicos) && data.crecheServicos.length) writeStore('otto:creche-servicos', crecheServicos);
+    if(data.crecheFechados && typeof data.crecheFechados==='object') writeStore('otto:creche-fechados', crecheFechados);
     writeStore('otto:settings', settings);
 
     if(data.photos){
