@@ -171,6 +171,7 @@
 <body>
 
 <div id="warningHost"></div>
+<div id="syncAlertHost"></div>
 
 <div class="wrap">
 
@@ -2972,7 +2973,14 @@ const Sync = (function(){
   let tracking = false, db = null, auth = null, user = null;
   let flushing = null, flushQueued = false, timer = null, sdkState = 'loading', lastError = '';
 
-  function savePending(){ rset(P_KEY, pending); }
+  // pending.since = quando surgiu a alteração mais antiga ainda não enviada
+  function savePending(){
+    const n = pendingCount();
+    if(n && !pending.since) pending.since = Date.now();
+    if(!n) pending.since = 0;
+    rset(P_KEY, pending);
+    checkAlert();
+  }
   function saveSynced(){ rset(S_KEY, synced); }
   function pendingCount(){
     let n = Object.keys(pending.kv).length + Object.keys(pending.ph).length;
@@ -3061,7 +3069,7 @@ const Sync = (function(){
         console.warn('sync flush', e); lastError = (e && e.code) || 'erro';
         return false;
       }finally{
-        flushing = null; renderStatus();
+        flushing = null; renderStatus(); checkAlert();
         if(flushQueued){ flushQueued = false; schedule(300); }
       }
     })();
@@ -3318,6 +3326,7 @@ const Sync = (function(){
     tracking = true;
     window.__ottoSync = { onPhotoPut, onPhotoDel };
     window.addEventListener('online', ()=> schedule(500));
+    setInterval(checkAlert, 60000);
     document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') schedule(500); });
     setTimeout(()=>{ try{ sessionStorage.removeItem('otto:sync-reloads'); }catch(e){} }, 15000);
     try{
@@ -3325,13 +3334,33 @@ const Sync = (function(){
       firebase.initializeApp(FIREBASE_CONFIG);
       auth = firebase.auth(); db = firebase.firestore();
       sdkState = 'ready';
-    }catch(e){ sdkState = 'failed'; renderStatus(); return; }
+    }catch(e){ sdkState = 'failed'; renderStatus(); checkAlert(); return; }
     auth.onAuthStateChanged(async u=>{
       user = u || null;
       if(!user){ showLogin(); renderStatus(); return; }
       hideLogin(); renderStatus();
       try{ await pull(); }catch(e){ console.warn('sync pull', e); lastError = (e && e.code) || 'erro'; await flush(); }
       renderStatus();
+    });
+  }
+  // ---- aviso: algo preso no celular com internet funcionando ----
+  const ALERT_AFTER_MS = 5*60*1000;
+  function checkAlert(){
+    const host = document.getElementById('syncAlertHost'); if(!host) return;
+    const stuck = (sdkState==='failed' || !!user) && pendingCount() > 0 && navigator.onLine !== false
+      && pending.since && (Date.now() - pending.since) > ALERT_AFTER_MS && !flushing;
+    if(!stuck){ host.innerHTML = ''; return; }
+    if(host.innerHTML) return;
+    host.innerHTML = `<div class="warning-fixed"><div class="warning-banner" style="align-items:center">
+      <div style="flex:1">Não estou conseguindo salvar na nuvem. Seus registros estão guardados no celular.</div>
+      <button id="syncRetryBtn" style="background:var(--ink); color:#fff; border-radius:8px; padding:5px 10px; font-size:.72rem; font-weight:600; flex-shrink:0">Tentar de novo</button>
+    </div></div>`;
+    document.getElementById('syncRetryBtn').addEventListener('click', async ()=>{
+      const b = document.getElementById('syncRetryBtn'); if(b){ b.disabled = true; b.textContent = 'Enviando...'; }
+      if(sdkState==='failed'){ location.reload(); return; }
+      host.innerHTML = '';
+      await flush();
+      checkAlert();
     });
   }
   return { start, renderStatus, flush, _debug: ()=>({pending, synced, shadow}) };
