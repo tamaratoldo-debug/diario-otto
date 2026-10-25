@@ -920,6 +920,13 @@ function logMedDoseNow(medId, dateStr, explicitTime){
   renderAll();
 }
 
+// "0,5 ml" -> {qty:"0,5", form:"ml"}; "1/2 comp" -> {qty:"1/2", form:"comp"};
+// sem número no começo, tudo vai pra forma.
+function splitDose(str){
+  const m = String(str||'').trim().match(/^(\d+(?:[.,]\d+)?(?:\s*\/\s*\d+)?)\s*(.*)$/);
+  return m ? {qty:m[1].replace(/\s+/g,''), form:m[2]} : {qty:'', form:String(str||'').trim()};
+}
+
 function openMedDoseEdit(medId, horario, dateStr, entryId){
   const host = document.getElementById('modalHost');
   const med = meds.find(m=>m.id===medId);
@@ -929,6 +936,10 @@ function openMedDoseEdit(medId, horario, dateStr, entryId){
   let entry = entryId ? entries.find(e=>e.id===entryId) : null;
   let timeVal = entry ? fmtTime(entry.date) : (horario||'');
   let doseVal = entry ? (entry.note||defaultDose||'') : (defaultDose||'');
+  // Na tela a dose aparece dividida em quantidade + forma ("7" + "gts"); ao
+  // salvar volta a ser um texto só, igual ao que o resto do app já usa.
+  const doseParts = splitDose(doseVal);
+  let qtyVal = doseParts.qty, formVal = doseParts.form, doseTouched = false;
 
   function render(){
     host.innerHTML = `<div class="overlay" id="ovMedDose">
@@ -943,7 +954,12 @@ function openMedDoseEdit(medId, horario, dateStr, entryId){
         <div class="sheet-body">
           <div class="hint" style="margin-bottom:14px">Editando só a dose deste dia · ${fmtDateShort(dateStr)}</div>
           <div class="field"><label>Horário administrado</label>${dtField('mdeTime','time',timeVal)}</div>
-          <div class="field"><label>Dose administrada</label><input id="mdeDose" autocomplete="off" value="${esc(doseVal)}" placeholder="dose (opcional)"/></div>
+          <div class="field"><label>Dose administrada</label>
+            <div style="display:grid; grid-template-columns:1fr 2fr; gap:10px">
+              <input id="mdeQty" inputmode="decimal" autocomplete="off" value="${esc(qtyVal)}" placeholder="quantidade"/>
+              <input id="mdeForm" autocomplete="off" value="${esc(formVal)}" placeholder="forma"/>
+            </div>
+          </div>
         </div>
         <div class="sheet-foot">
           <button class="btn-secondary" id="mdeCancel">Cancelar</button>
@@ -963,7 +979,8 @@ function openMedDoseEdit(medId, horario, dateStr, entryId){
       else openConfirmSkipSlot(medId, horario, dateStr, med.name);
     });
     wireDtField('mdeTime', v=>{ timeVal=v; });
-    document.getElementById('mdeDose').addEventListener('input', e=>{ doseVal=e.target.value; });
+    document.getElementById('mdeQty').addEventListener('input', e=>{ qtyVal=e.target.value; doseTouched=true; });
+    document.getElementById('mdeForm').addEventListener('input', e=>{ formVal=e.target.value; doseTouched=true; });
     document.getElementById('mdeSave').addEventListener('click', save);
   }
 
@@ -972,6 +989,7 @@ function openMedDoseEdit(medId, horario, dateStr, entryId){
     let date = new Date(y, mo-1, da);
     if(timeVal){ const [hh,mm] = timeVal.split(':').map(Number); date.setHours(hh,mm,0,0); }
     else date.setHours(12,0,0,0);
+    if(doseTouched) doseVal = [qtyVal.trim(), formVal.trim()].filter(Boolean).join(' ');
     if(entry){
       entry.date = date.toISOString();
       entry.note = doseVal.trim();
