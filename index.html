@@ -797,7 +797,8 @@ function pastMedGroupHtml(dayKey, dateStr, remedioEntries, searchQuery){
       <button data-med="${m.id}" data-horario="${esc(r.horario)}" data-med-date="${esc(dateStr)}" aria-label="${given?'Dado, toque pra desfazer':'Marcar como dado'}" style="background:none; border:none; padding:6px; margin:0 -6px 0 0; cursor:pointer; flex-shrink:0">
         <span class="pending-checkbox" style="${given?`background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}`:''}">${given?icon('check',11,'#fff'):''}</span>
       </button>`;
-    return { sortKey: r.horario||'99:99', name: m.name, inner };
+    // Dose já dada entra na ordem pelo horário real; pendente, pelo do cadastro.
+    return { sortKey: (given ? displayTime : r.horario)||'99:99', name: m.name, inner };
   });
 
   const adHocRowsHtml = adHoc.map(e=>{
@@ -846,7 +847,8 @@ function pendingRowsHtml(activeSlots, adHocEntries){
       <button data-med="${m.id}" data-horario="${esc(s.horario)}" aria-label="${given?'Dado hoje, toque pra desfazer':'Marcar como dado'}" style="background:none; border:none; padding:6px; margin:0 -6px 0 0; cursor:pointer; flex-shrink:0">
         <span class="pending-checkbox" style="${given?`background:${CATEGORIES.remedio.hex}; border-color:${CATEGORIES.remedio.hex}`:''}">${given?icon('check',11,'#fff'):''}</span>
       </button>`;
-    return { sortKey: s.horario||'99:99', name: m.name, inner };
+    // Dose já dada entra na ordem pelo horário real; pendente, pelo do cadastro.
+    return { sortKey: (given ? displayTime : s.horario)||'99:99', name: m.name, inner };
   });
 
   const adHocRows = adHocEntries.map(e=>{
