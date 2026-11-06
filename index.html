@@ -2064,14 +2064,36 @@ function openCrecheModal(editingLanc){
   render();
 }
 
+// Parte de um lançamento que cabe num mês. Hospedagem que atravessa a virada
+// do mês é dividida pelas noites de cada mês (a creche cobra assim); o resto
+// cai inteiro no mês da data. Retorna null se nada cai no mês.
+function crecheParteDoMes(l, monthKey){
+  const noites = l.dataSaida ? diffDias(l.data, l.dataSaida) : 0;
+  if(noites < 1) return l.data.slice(0,7)===monthKey ? {valor:l.valor, dias:0, total:0, dataGrupo:l.data} : null;
+  let dias = 0, primeira = null;
+  const d = new Date(l.data+'T00:00:00');
+  for(let i=0;i<noites;i++){
+    const ds = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    if(ds.slice(0,7)===monthKey){ dias++; if(!primeira) primeira = ds; }
+    d.setDate(d.getDate()+1);
+  }
+  if(!dias) return null;
+  if(dias===noites) return {valor:l.valor, dias:0, total:0, dataGrupo:l.data};
+  return {valor: Math.round(l.valor*dias/noites*100)/100, dias, total:noites, dataGrupo:primeira};
+}
+
 function openCrecheManager(){
   const host = document.getElementById('modalHost');
   const cat = CATEGORIES.creche;
   let monthKey = todayStr().slice(0,7);
   let copiedFeedback = false;
 
-  function lancamentosDoMes(){ return crecheLancamentos.filter(l=> l.data.slice(0,7)===monthKey).sort((a,b)=> a.data.localeCompare(b.data)); }
-  function totalDoMes(){ return lancamentosDoMes().reduce((s,l)=> s+l.valor, 0); }
+  function lancamentosDoMes(){
+    return crecheLancamentos.map(l=>{ const p = crecheParteDoMes(l, monthKey); return p ? Object.assign({}, l, {valorMes:p.valor, diasMes:p.dias, diasTotal:p.total, dataGrupo:p.dataGrupo}) : null; })
+      .filter(Boolean).sort((a,b)=> a.dataGrupo.localeCompare(b.dataGrupo));
+  }
+  function totalDoMes(){ return Math.round(lancamentosDoMes().reduce((s,l)=> s+l.valorMes, 0)*100)/100; }
+  function diariasTxt(l){ return l.diasMes ? `${l.diasMes} de ${l.diasTotal} diária${l.diasTotal>1?'s':''}` : ''; }
   function fechado(){ return !!crecheFechados[monthKey]; }
   function monthLabel(){ const [y,m] = monthKey.split('-').map(Number); return fmtMonthYear(new Date(y, m-1, 1)); }
   function shiftMonth(delta){ const [y,m] = monthKey.split('-').map(Number); const d = new Date(y, m-1+delta, 1); monthKey = `${d.getFullYear()}-${pad(d.getMonth()+1)}`; }
@@ -2080,17 +2102,17 @@ function openCrecheManager(){
   function resumoTexto(){
     const list = lancamentosDoMes();
     const linhas = list.map(l=>{
-      const periodo = l.dataSaida ? `${fmtDDMM(l.data)} a ${fmtDDMM(l.dataSaida)}` : fmtDDMM(l.data);
+      const periodo = (l.dataSaida ? `${fmtDDMM(l.data)} a ${fmtDDMM(l.dataSaida)}` : fmtDDMM(l.data)) + (l.diasMes ? ` (${diariasTxt(l)})` : '');
       const obs = l.obs ? ` - ${l.obs}` : '';
-      const valorTxt = l.valor ? `R$ ${fmtValorBR(l.valor)}` : 'valor pendente';
+      const valorTxt = l.valor ? `R$ ${fmtValorBR(l.valorMes)}` : 'valor pendente';
       return `${periodo} - ${l.servicoNome}: ${valorTxt}${obs}`;
     });
     return `${monthLabel()}\n${linhas.join('\n')}\n\nTotal: R$ ${fmtValorBR(totalDoMes())}`;
   }
 
   function itemHtml(l){
-    const periodo = l.dataSaida ? `${fmtDDMM(l.data)} a ${fmtDDMM(l.dataSaida)}` : '';
-    const valorHtml = l.valor ? `R$ ${fmtValorBR(l.valor)}` : `<span class="badge" style="background:${cat.bgHex}; color:${cat.hex}">sem valor</span>`;
+    const periodo = l.dataSaida ? [`${fmtDDMM(l.data)} a ${fmtDDMM(l.dataSaida)}`, diariasTxt(l)].filter(Boolean).join(' · ') : '';
+    const valorHtml = l.valor ? `R$ ${fmtValorBR(l.valorMes)}` : `<span class="badge" style="background:${cat.bgHex}; color:${cat.hex}">sem valor</span>`;
     return `<div style="flex:1; min-width:0; cursor:pointer" data-open="${l.id}"><div class="name">${esc(l.servicoNome)}${l.obs?' · '+esc(l.obs):''}</div>${periodo?`<div class="sub">${periodo}</div>`:''}</div>
       <div style="font-weight:600; font-size:.85rem; flex-shrink:0; margin-left:10px">${valorHtml}</div>
       <button class="del-btn" data-del="${l.id}">${icon('trash',14,'var(--ink-muted)')}</button>`;
@@ -2099,8 +2121,8 @@ function openCrecheManager(){
   function groupByDate(list){
     const groups = [];
     for(const l of list){
-      let g = groups.find(g=> g.data===l.data);
-      if(!g){ g = {data:l.data, items:[]}; groups.push(g); }
+      let g = groups.find(g=> g.data===l.dataGrupo);
+      if(!g){ g = {data:l.dataGrupo, items:[]}; groups.push(g); }
       g.items.push(l);
     }
     return groups;
