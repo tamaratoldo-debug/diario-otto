@@ -1096,8 +1096,10 @@ function renderTimeline(){
   if(filter!=='todos') list = list.filter(e=>e.category===filter);
   const isSearching = !!search.trim();
   if(isSearching){
-    const q = normalizeSearch(search);
-    list = list.filter(e => normalizeSearch(e.title).includes(q) || normalizeSearch(e.note).includes(q) || normalizeSearch(e.clinica).includes(q) || normalizeSearch(e.quantidade).includes(q));
+    // Vários termos separados por vírgula: aparece o registro que bater com qualquer um.
+    const terms = search.split(',').map(t=> normalizeSearch(t.trim())).filter(Boolean);
+    const hit = v=> { const n = normalizeSearch(v); return terms.some(q=> n.includes(q)); };
+    list = list.filter(e => hit(e.title) || hit(e.note) || hit(e.clinica) || hit(e.quantidade));
   }
   list = expandCrecheSpans(list);
   list.sort((a,b)=> new Date(b.date)-new Date(a.date));
