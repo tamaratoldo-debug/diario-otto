@@ -1295,7 +1295,7 @@ function renderUpcoming(){
   const first = items[0];
   const resumo = `Próximo: ${esc(first.title)} ${esc(upcomingDayLabel(first.date))}${items.length>1?` · e mais ${items.length-1}`:''}`;
   const lista = upcomingOpen ? `<div style="margin-top:6px">${items.map(e=>
-      `<div class="hint" style="font-weight:600; margin:8px 0 2px; text-transform:capitalize">${esc(upcomingDayLabel(e.date))}</div>${entryRowHtml(e)}`).join('')}</div>` : '';
+      `<div class="hint" style="font-weight:600; margin:8px 0 2px; text-transform:capitalize">${esc(upcomingDayLabel(e.date))}</div>${entryRowHtml(e).replace(/<div class="entry-sub">[\s\S]*?<\/div>/, '')}`).join('')}</div>` : '';
   host.innerHTML = `<button id="upcomingToggle" style="display:flex; align-items:center; gap:6px; width:100%; background:none; border:none; padding:0; font-family:inherit; font-size:.82rem; color:var(--ink-muted); cursor:pointer; text-align:left">
       ${icon('calendar',14,'var(--ink-muted)')}<span style="flex:1">${resumo}</span>${icon(upcomingOpen?'chevronUp':'chevronDown',14,'var(--ink-muted)')}
     </button>${lista}`;
