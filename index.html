@@ -197,6 +197,7 @@
     </div>
   </div>
 
+  <div style="margin-top:16px; padding:0 4px" id="upcomingHost"></div>
   <div style="margin-top:16px; padding:0 4px" id="timeline"></div>
 </div>
 
@@ -514,6 +515,7 @@ function persistCollapsedMonths(){ writeStore('otto:collapsed-months', [...colla
 // abertura do app (não persiste — decisão consciente, pra sempre abrir já
 // mostrando o checklist de remédios do dia sem precisar tocar em nada).
 let expandedDays = new Set([new Date().toDateString()]);
+let upcomingOpen = false;
 let search = '';
 let profilePhotoUrl = null;
 
@@ -1102,6 +1104,10 @@ function renderTimeline(){
     list = list.filter(e => hit(e.title) || hit(e.note) || hit(e.clinica) || hit(e.quantidade));
   }
   list = expandCrecheSpans(list);
+  // Dias futuros (algo agendado) ficam fora da timeline; aparecem na linha "Próximo".
+  const todayLocal = todayStr();
+  list = list.filter(e=> toLocalDateStr(new Date(e.date)) <= todayLocal);
+  renderUpcoming();
   list.sort((a,b)=> new Date(b.date)-new Date(a.date));
 
   const host = document.getElementById('timeline');
@@ -1268,6 +1274,33 @@ function renderTimeline(){
     persistCollapsedMonths();
     renderTimeline();
   }));
+}
+
+// Linha discreta acima da timeline com o que está agendado pra depois de hoje.
+function upcomingDayLabel(iso){
+  const today = new Date(todayStr()+'T00:00:00');
+  const d = new Date(toLocalDateStr(new Date(iso))+'T00:00:00');
+  const diff = Math.round((d-today)/86400000);
+  if(diff===1) return 'amanhã';
+  if(diff>1 && diff<7) return d.toLocaleDateString('pt-BR',{weekday:'long'}).replace('-feira','');
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}`;
+}
+function renderUpcoming(){
+  const host = document.getElementById('upcomingHost'); if(!host) return;
+  const todayLocal = todayStr();
+  const items = entries.filter(e=> toLocalDateStr(new Date(e.date)) > todayLocal)
+    .sort((a,b)=> new Date(a.date)-new Date(b.date));
+  if(!items.length){ host.innerHTML = ''; host.style.display = 'none'; return; }
+  host.style.display = '';
+  const first = items[0];
+  const resumo = `Próximo: ${esc(first.title)} ${esc(upcomingDayLabel(first.date))}${items.length>1?` · e mais ${items.length-1}`:''}`;
+  const lista = upcomingOpen ? `<div style="margin-top:6px">${items.map(e=>
+      `<div class="hint" style="font-weight:600; margin:8px 0 2px; text-transform:capitalize">${esc(upcomingDayLabel(e.date))}</div>${entryRowHtml(e)}`).join('')}</div>` : '';
+  host.innerHTML = `<button id="upcomingToggle" style="display:flex; align-items:center; gap:6px; width:100%; background:none; border:none; padding:0; font-family:inherit; font-size:.82rem; color:var(--ink-muted); cursor:pointer; text-align:left">
+      ${icon('calendar',14,'var(--ink-muted)')}<span style="flex:1">${resumo}</span>${icon(upcomingOpen?'chevronUp':'chevronDown',14,'var(--ink-muted)')}
+    </button>${lista}`;
+  document.getElementById('upcomingToggle').addEventListener('click', ()=>{ upcomingOpen = !upcomingOpen; renderUpcoming(); });
+  host.querySelectorAll('[data-id]').forEach(b=> b.addEventListener('click', ()=> openEntryModal(null, b.dataset.id)));
 }
 
 function renderAll(){ renderHero(); renderTimeline(); }
