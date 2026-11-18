@@ -106,6 +106,9 @@
   .entry-row{width:100%; text-align:left; background:none; border:none; padding:10px 0; font-family:inherit; cursor:pointer; border-bottom:1px solid #F1EEE6; color:var(--ink)}
   .entry-row:last-child{border-bottom:none; padding-bottom:0}
   .entry-row:first-child{padding-top:0}
+  .entry-row.entry-hit{background:#FBF1EE; border-radius:10px; padding-left:8px; padding-right:8px; margin:0 -8px; width:calc(100% + 16px); border-bottom-color:transparent}
+  .entry-row.entry-hit:first-child{padding-top:10px}
+  .day-full-toggle{width:100%; background:none; border:none; border-top:1px solid #F1EEE6; margin-top:10px; padding:10px 0 0; font-family:inherit; font-size:.78rem; font-weight:600; color:var(--ink-muted); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px}
   .entry-top{display:flex; align-items:center; justify-content:space-between; gap:8px}
   .entry-title{display:flex; align-items:center; gap:6px; min-width:0; font-size:.88rem; font-weight:600}
   .entry-title span{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -509,6 +512,7 @@ if(!settings.sheetLink){
 let filter = 'todos';
 let medsExpanded = false;
 let expandedMedGroups = new Set();
+let fullDays = new Set();   // dias abertos por inteiro durante uma busca
 let collapsedMonths = new Set(store.get('otto:collapsed-months', []));
 function persistCollapsedMonths(){ writeStore('otto:collapsed-months', [...collapsedMonths]); }
 // Dias colapsados viram quadradinhos; hoje sempre nasce expandido a cada
@@ -1215,14 +1219,25 @@ function renderTimeline(){
       // recriado. Isso evita reconstruir a timeline inteira a cada toque, o que
       // era a causa do salto de rolagem.
       cardsHtml += `<div class="day-card" data-daycard="${esc(day.key)}" style="${isExpanded?'':'display:none'}"><div class="day-num"><div class="n">${dayNum}</div></div><div class="day-sep"></div><div class="entries-col">`;
-      cardsHtml += pendingHtml;
-      const sortedItems = day.items.slice().sort((a,b)=>{
+      const byTime = (a,b)=>{
         const rank = e=> e.category==='creche' ? 0 : (e.noTime ? 2 : 1);
         const ra = rank(a), rb = rank(b);
         if(ra!==rb) return ra-rb;
         return new Date(a.date) - new Date(b.date);
-      });
-      cardsHtml += sortedItems.map(entryRowHtml).join('');
+      };
+      if(isSearching && fullDays.has(day.key)){
+        // Dia inteiro: tudo o que aconteceu nele, com os resultados da busca destacados.
+        const hitIds = new Set(day.items.map(e=> e.id));
+        const dayAll = expandCrecheSpans(entries).filter(e=> e.category!=='remedio' && new Date(e.date).toDateString()===day.key).sort(byTime);
+        const dayRemedio = entries.filter(e=> e.category==='remedio' && new Date(e.date).toDateString()===day.key);
+        cardsHtml += pastMedGroupHtml('full|'+day.key, toLocalDateStr(new Date(day.key)), dayRemedio, '');
+        cardsHtml += dayAll.map(e=>{ const h = entryRowHtml(e); return hitIds.has(e.id) ? h.replace('class="entry-row"','class="entry-row entry-hit"') : h; }).join('');
+        cardsHtml += `<button class="day-full-toggle" data-fullday="${esc(day.key)}">Ver só os resultados ${icon('chevronUp',13,'var(--ink-muted)')}</button>`;
+      } else {
+        cardsHtml += pendingHtml;
+        cardsHtml += day.items.slice().sort(byTime).map(entryRowHtml).join('');
+        if(isSearching) cardsHtml += `<button class="day-full-toggle" data-fullday="${esc(day.key)}">Ver dia inteiro ${icon('chevronDown',13,'var(--ink-muted)')}</button>`;
+      }
       cardsHtml += `</div></div>`;
     }
     if(squaresHtml){
@@ -1263,6 +1278,13 @@ function renderTimeline(){
   }));
   const medsToggle = document.getElementById('medsSummaryToggle');
   if(medsToggle) medsToggle.addEventListener('click', ()=>{ medsExpanded = !medsExpanded; renderTimeline(); });
+  host.querySelectorAll('[data-fullday]').forEach(b=> b.addEventListener('click', ()=>{
+    const key = b.dataset.fullday, y = window.scrollY;
+    if(fullDays.has(key)) fullDays.delete(key);
+    else { fullDays.add(key); expandedMedGroups.add('full|'+key); }
+    renderTimeline();
+    window.scrollTo(0, y);
+  }));
   host.querySelectorAll('[data-medgroup-toggle]').forEach(b=> b.addEventListener('click', ()=>{
     const key = b.dataset.medgroupToggle;
     if(expandedMedGroups.has(key)) expandedMedGroups.delete(key); else expandedMedGroups.add(key);
@@ -2989,7 +3011,7 @@ function openMedManager(onDone, jumpToId, startAdding){
 }
 
 // ---------- top-level wiring ----------
-document.getElementById('searchInput').addEventListener('input', e=>{ search=e.target.value; renderTimeline(); });
+document.getElementById('searchInput').addEventListener('input', e=>{ search=e.target.value; fullDays.clear(); renderTimeline(); });
 document.getElementById('searchToggleBtn').addEventListener('click', ()=>{
   const box = document.getElementById('searchBox');
   const opening = box.style.display==='none';
