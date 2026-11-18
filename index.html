@@ -108,7 +108,6 @@
   .entry-row:first-child{padding-top:0}
   .entry-row.entry-hit{background:#FBF1EE; border-radius:10px; padding-left:8px; padding-right:8px; margin:0 -8px; width:calc(100% + 16px); border-bottom-color:transparent}
   .entry-row.entry-hit:first-child{padding-top:10px}
-  .day-full-toggle{width:100%; background:none; border:none; border-top:1px solid #F1EEE6; margin-top:10px; padding:10px 0 0; font-family:inherit; font-size:.78rem; font-weight:600; color:var(--ink-muted); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px}
   .entry-top{display:flex; align-items:center; justify-content:space-between; gap:8px}
   .entry-title{display:flex; align-items:center; gap:6px; min-width:0; font-size:.88rem; font-weight:600}
   .entry-title span{white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
@@ -1218,7 +1217,9 @@ function renderTimeline(){
       // Cada dia sempre existe no DOM, só escondido/mostrado via display — nunca
       // recriado. Isso evita reconstruir a timeline inteira a cada toque, o que
       // era a causa do salto de rolagem.
-      cardsHtml += `<div class="day-card" data-daycard="${esc(day.key)}" style="${isExpanded?'':'display:none'}"><div class="day-num"><div class="n">${dayNum}</div></div><div class="day-sep"></div><div class="entries-col">`;
+      // Na busca, tocar no número do dia abre/fecha o dia inteiro.
+      const numAttr = isSearching ? ` data-fullday="${esc(day.key)}" style="cursor:pointer"` : '';
+      cardsHtml += `<div class="day-card" data-daycard="${esc(day.key)}" style="${isExpanded?'':'display:none'}"><div class="day-num"${numAttr}><div class="n">${dayNum}</div></div><div class="day-sep"></div><div class="entries-col">`;
       const byTime = (a,b)=>{
         const rank = e=> e.category==='creche' ? 0 : (e.noTime ? 2 : 1);
         const ra = rank(a), rb = rank(b);
@@ -1232,11 +1233,9 @@ function renderTimeline(){
         const dayRemedio = entries.filter(e=> e.category==='remedio' && new Date(e.date).toDateString()===day.key);
         cardsHtml += pastMedGroupHtml('full|'+day.key, toLocalDateStr(new Date(day.key)), dayRemedio, '');
         cardsHtml += dayAll.map(e=>{ const h = entryRowHtml(e); return hitIds.has(e.id) ? h.replace('class="entry-row"','class="entry-row entry-hit"') : h; }).join('');
-        cardsHtml += `<button class="day-full-toggle" data-fullday="${esc(day.key)}">Ver só os resultados ${icon('chevronUp',13,'var(--ink-muted)')}</button>`;
       } else {
         cardsHtml += pendingHtml;
         cardsHtml += day.items.slice().sort(byTime).map(entryRowHtml).join('');
-        if(isSearching) cardsHtml += `<button class="day-full-toggle" data-fullday="${esc(day.key)}">Ver dia inteiro ${icon('chevronDown',13,'var(--ink-muted)')}</button>`;
       }
       cardsHtml += `</div></div>`;
     }
